@@ -59,4 +59,6 @@ test.*
 .vscode/
 
 install_build.sh
+dist/
+build/
 
