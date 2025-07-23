@@ -1,0 +1,49 @@
+
+services:
+
+  memory-redis:
+    container_name: memory-redis
+    restart: always
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - memory-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks:
+      - memory-network
+
+  memory-qdrant:
+    container_name: memory-qdrant
+    platform: linux/amd64
+    image: qdrant/qdrant:v1.13.4
+    restart: always
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    expose:
+      - 6333
+      - 6334
+      - 6335
+    volumes:
+      - memory-qdrant-data:/qdrant/storage:z
+      - ./qdrant/config.yml:/qdrant/config.yml:ro
+    networks:
+      - memory-network
+
+volumes:
+  memory-qdrant-data:
+  memory-redis-data:
+
+networks:
+  memory-network:
+    name: memory-network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.110.0/24
