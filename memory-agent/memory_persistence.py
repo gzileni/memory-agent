@@ -81,7 +81,7 @@ class MemoryPersistence(MemoryStore):
         self.qdrant_client = QdrantClient(url=self.qdrant_url)
         self.qdrant_client.set_model(self.model_embedding_vs_name)
 
-    async def get_vector_store(self, collection : str | None = None) -> QdrantVectorStore: # type: ignore
+    async def get_vector_store(self, collection : str | None = None) -> QdrantVectorStore:
         """
         Get or create a Qdrant vector store for the specified collection.
         Args:
@@ -129,13 +129,14 @@ class MemoryPersistence(MemoryStore):
         """
         return self.qdrant_client
 
-    async def search_filter_async(self, query : str, metadata_value: str, collection : str | None = None): # type: ignore
+    async def search_filter_async(self, query : str, metadata_value: str, collection : str | None = None) -> list[Document]:
         """
         Get the filter conditions for the Qdrant search.
 
         Args:
             query:  The search query.
             metadata_value:  The value to match in the metadata field.
+            collection (str | None): The name of the collection to use. If None, uses the default collection name.
 
         Returns:
             list: A list of filter conditions for the Qdrant search.
@@ -144,7 +145,7 @@ class MemoryPersistence(MemoryStore):
 
         vs = await self.get_vector_store(collection=collection)
 
-        return vs.asimilarity_search(
+        return await vs.asimilarity_search(
             query=query,
             k=1,
             filter=metadata_query

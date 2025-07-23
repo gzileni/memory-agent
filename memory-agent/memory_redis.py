@@ -257,10 +257,9 @@ def _parse_redis_checkpoint_data(
     }
         
     return CheckpointTuple(
-        config=config, 
+        config=config,
         checkpoint=checkpoint,
         metadata=metadata,
         parent_config=parent_config, 
         pending_writes=pending_writes,
     )
-    

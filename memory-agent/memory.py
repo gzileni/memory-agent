@@ -3,8 +3,10 @@ from abc import abstractmethod
 from typing import Any, Literal
 from langchain_openai import OpenAIEmbeddings
 from langchain_ollama import OllamaEmbeddings
+from langchain_qdrant import QdrantVectorStore
 from langgraph.store.memory import InMemoryStore
 from langgraph.store.base import IndexConfig
+from langchain_core.documents import Document
 from fastembed import TextEmbedding
 from fastembed.common.model_description import PoolingType, ModelSource
 
@@ -164,7 +166,7 @@ class MemoryStore:
         return InMemoryStore(index=config)
 
     @abstractmethod
-    async def get_vector_store(self):
+    async def get_vector_store(self, collection : str | None = None) -> QdrantVectorStore:
         """ Get or create a vector store for the specified collection.
         Returns:
             Any: The vector store for the specified collection.
@@ -172,7 +174,7 @@ class MemoryStore:
         pass
 
     @abstractmethod
-    async def search_filter_async(self, query : str, metadata_value: str):
+    async def search_filter_async(self, query : str, metadata_value: str, collection : str | None = None) -> list[Document]:
         """
         Get the filter conditions for the search.
         Args:
