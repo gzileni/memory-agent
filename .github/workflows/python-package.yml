@@ -35,3 +35,35 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+     - name: pypi-publisher
+        # You may pin to the exact commit or the version.
+        # uses: thevickypedia/pypi-publisher@9af9b62216863744421ab5fb81fbbcac58f5d055
+        uses: thevickypedia/pypi-publisher@v3
+        with:
+          # PyPI user
+          user: # optional, default is __token__
+          # Password for your PyPI user or an access token
+          token: ${{ secrets.PYPI_TOKEN }}
+          # Upload distributions to TestPyPI
+          test-upload: # optional, default is false
+          # Builds the distribution without uploading to PyPi
+          dry-run: # optional, default is false
+          # The repository URL to use
+          repository-url: # optional
+          # The target directory for distribution
+          packages-dir: # optional, default is dist
+          # Check metadata before uploading
+          verify-metadata: # optional, default is true
+          # Do not fail if a Python package distribution exists in the target package index
+          skip-existing: # optional, default is false
+          # Show verbose output.
+          verbose: # optional, default is false
+          # Show hash values of distribution files
+          print-hash: # optional, default is true
+          # Use setup python to load python env.
+          setup-python: # optional, default is false
+          # Use checkout action to checkout the repository.
+          checkout: # optional, default is true
+          # Python version to use.
+          python-version: 3.12
+          
