@@ -40,10 +40,6 @@ jobs:
         # uses: thevickypedia/pypi-publisher@9af9b62216863744421ab5fb81fbbcac58f5d055
       uses: thevickypedia/pypi-publisher@v3
       with:
-        # PyPI user
-        user: gzileni
-        # Password for your PyPI user or an access token
         token: ${{ secrets.PYPI_TOKEN }}
-        # Python version to use.
         python-version: 3.12
           
