@@ -1,0 +1,18 @@
+title: Memory Agent
+description: >-
+  A Python library for advanced memory management in AI agent applications
+
+theme: "just-the-docs"
+
+color_scheme: "auto"
+
+# Imposta il repo link (comparirà come icona in alto a destra)
+repository_url: https://github.com/giuseppezileni/memory_agent
+
+nav_external_links:
+  - title: "⭐ Star su GitHub"
+    url: https://github.com/giuseppezileni/memory_agent
+    hide_icon: false
+  - title: "📖 LinkedIn"
+    url: https://www.linkedin.com/in/gzileni
+    hide_icon: false

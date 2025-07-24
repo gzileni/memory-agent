@@ -1,3 +1,9 @@
+---
+layout: home
+title: Benvenuto
+nav_order: 1
+---
+
 # memory-agent
 
 The library allows you to manage both [persistence](https://langchain-ai.github.io/langgraph/how-tos/persistence/) and [**memory**](https://langchain-ai.github.io/langgraph/concepts/memory/#what-is-memory) for a LangGraph agent.
