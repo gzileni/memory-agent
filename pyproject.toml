@@ -144,7 +144,6 @@ dependencies = [
     "pytz>=2025.2",
     "PyYAML>=6.0.2",
     "qdrant-client>=1.14.2",
-    "qi-log-loki>=1.0.0",
     "RapidFuzz>=3.13.0",
     "readme_renderer>=44.0",
     "redis>=6.2.0",
