@@ -1,4 +1,4 @@
-# [memory-agent](https://github.com/gzileni/memory-agent) `v1.0.43`
+# [memory-agent](https://github.com/gzileni/memory-agent) `v1.0.44`
 
 The library allows you to manage both [persistence](https://langchain-ai.github.io/langgraph/how-tos/persistence/) and [**memory**](https://langchain-ai.github.io/langgraph/concepts/memory/#what-is-memory) for a LangGraph agent.
 

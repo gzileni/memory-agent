@@ -1,13 +1,13 @@
-theme: minima
+remote_theme: jekyll/minima@3.0.0
 title: Memory Agent
 description: >-
   A Python library for advanced memory management in AI agent applications
-version: 1.0.43
+version: 1.0.44
 minima:
   navigation:
       - title: "Home"
         url: /
-      - title: "Versione: v1.0.43"
+      - title: "v1.0.44"
         url: "#"
       - title: "GitHub"
         url: https://github.com/gzileni/memory_agent
