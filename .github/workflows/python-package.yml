@@ -36,22 +36,8 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: PyPI Deployment
-        # You may pin to the exact commit or the version.
-        # uses: casperdcl/deploy-pypi@928e3123266d588b46c017228f9a9d4c13ad4c93
-      uses: casperdcl/deploy-pypi@v2.5.0
+      uses: etils-actions/pypi-build-publish@v1
       with:
-        # PyPI username
-        user: __token__
-        # PyPI password or API token
-        password: ${{ secrets.PYPI_TOKEN }}
-        # Packages to `pip install` before building
-        build: true
-        # Whether to run basic checks on the built files
-        check: true
-        # Whether to upload
-        upload: true
-        # Directory containing distributions
-        dist_dir: dist
-        # Continue uploading files if one already exists
-        skip_existing: true
+        pypi-token: ${{ secrets.PYPI_TOKEN }}
+        path: dist
           
