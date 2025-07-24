@@ -221,3 +221,15 @@ client_async = qdrant.get_client_async()
 ```
 
 ## [Docker](./DOCKER.md)
+
+## Grafana Logging
+
+To enable logging compatible with Grafana and Loki, simply set the following environment variables:
+
+- `APP_NAME`: The name of your application (default: `"logger"`)
+- `LOKI_URL`: The URL of your Loki instance (for example: `"http://localhost:3100/loki/api/v1/push"`)
+- `LOG_LEVEL`: The desired log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`)
+- `APP_SERVICE`: The name of the service (default: `"logger_service"`)
+- `APP_VERSION`: The version of your application (default: `"1.0.0"`)
+
+Once these variables are set, your logs will be compatible with Grafana dashboards and Loki log aggregation.

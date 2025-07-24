@@ -1,5 +1,6 @@
+import os
+import inspect
 from datetime import datetime, timedelta, timezone
-
 from contextlib import asynccontextmanager
 from typing import (
     Any,
@@ -9,7 +10,6 @@ from typing import (
     Optional,
     Tuple,
 )
-
 from langchain_core.runnables import RunnableConfig
 from typing import Sequence
 from langgraph.checkpoint.base import (
@@ -22,7 +22,7 @@ from langgraph.checkpoint.base import (
     PendingWrite,
 )
 from redis.asyncio import Redis as AsyncRedis
-import inspect
+from .memory_log import get_metadata, get_logger
 from .memory_redis import (_make_redis_checkpoint_key, 
                            _make_redis_checkpoint_writes_key, 
                            _parse_redis_checkpoint_key,
@@ -66,6 +66,7 @@ class MemoryCheckpointer(BaseCheckpointSaver):
     """
 
     conn: AsyncRedis
+    logger = get_logger(name="memory_checkpointer", loki_url=os.getenv("LOKI_URL"))
 
     def __init__(self, conn: AsyncRedis):
         super().__init__()
@@ -250,7 +251,7 @@ class MemoryCheckpointer(BaseCheckpointSaver):
                         if ts_dt < (now - timedelta(minutes=filter_minutes)):
                             await self.conn.delete(key)
                     except Exception as e:
-                        print(f"Errore su {key}: {e}")
+                        self.logger.error(f"adelete_by_thread_id - Errore su {key}: {e}", get_metadata(thread_id))
                         raise e
 
     async def alist(

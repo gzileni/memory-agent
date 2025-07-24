@@ -8,6 +8,7 @@ from qdrant_client import models, AsyncQdrantClient, QdrantClient
 from .memory import MemoryStore
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from .memory_log import get_logger
 
 class MemoryPersistence(MemoryStore):
     """
@@ -52,6 +53,7 @@ class MemoryPersistence(MemoryStore):
     qdrant_url : str | None = None
     qdrant_client_async: AsyncQdrantClient
     qdrant_client: QdrantClient
+    logger = get_logger(name="memory_persistence", loki_url=os.getenv("LOKI_URL"))
 
     def __init__(self, **kwargs: Any) -> None:
         """
@@ -100,9 +102,9 @@ class MemoryPersistence(MemoryStore):
                 collection_name=collection_name,
                 vectors_config=VectorParams(size=self.collection_dim, distance=Distance.COSINE)
             )
-            print(f"Collection '{collection_name}' created successfully!")
+            self.logger.info(f"Collection '{collection_name}' created successfully!")
         else:
-            print(f"Collection '{collection_name}' already exists.")
+            self.logger.info(f"Collection '{collection_name}' already exists.")
 
         # Initialize Qdrant vector store from the existing collection
         return QdrantVectorStore.from_existing_collection(
@@ -194,9 +196,9 @@ class MemoryPersistence(MemoryStore):
         """
         try:
             await self.qdrant_client_async.delete_collection(collection_name=collection)
-            print(f"Collection '{collection}' deleted successfully.")
+            self.logger.info(f"Collection '{collection}' deleted successfully.")
         except Exception as e:
-            print(f"Error deleting collection '{collection}': {e}")
+            self.logger.error(f"Error deleting collection '{collection}': {e}")
             raise e
 
     def delete_collection(self, collection: str):
@@ -208,9 +210,9 @@ class MemoryPersistence(MemoryStore):
         """
         try:
             self.qdrant_client.delete_collection(collection_name=collection)
-            print(f"Collection '{collection}' deleted successfully.")
+            self.logger.info(f"Collection '{collection}' deleted successfully.")
         except Exception as e:
-            print(f"Error deleting collection '{collection}': {e}")
+            self.logger.error(f"Error deleting collection '{collection}': {e}")
             raise e
 
     async def retriever(self, urls: list[str], **kwargs) -> Any:
@@ -265,21 +267,22 @@ class MemoryPersistence(MemoryStore):
         # Try to fetch the collection status
         try:
             await self.qdrant_client_async.get_collection(collection_name)
-            print(f"Skipping creating collection; '{collection_name}' already exists.")
+            self.logger.info(f"Skipping creating collection; '{collection_name}' already exists.")
             return True
         except Exception as e:
             # If collection does not exist, an error will be thrown, so we create the collection
             if 'Not found: Collection' in str(e):
-                print(f"Collection '{collection_name}' not found. Creating it now...")
+                self.logger.info(f"Collection '{collection_name}' not found. Creating it now...")
 
                 await self.qdrant_client_async.create_collection(
                     collection_name=collection_name,
-                    vectors_config=models.VectorParams(size=vector_dimension, distance=models.Distance.COSINE)
+                    vectors_config=models.VectorParams(size=vector_dimension, 
+                                                       distance=models.Distance.COSINE)
                 )
-                print(f"Collection '{collection_name}' created successfully.")
+                self.logger.info(f"Collection '{collection_name}' created successfully.")
                 return True
             else:
-                print(f"Error while checking collection: {e}")
+                self.logger.error(f"Error while checking collection: {e}")
                 return False
     
     async def add_documents_async(self, documents: list[Document], collection: str | None = None):
@@ -308,7 +311,7 @@ class MemoryPersistence(MemoryStore):
 
         # Add only new documents to the vector store
         if new_documents:
-            print(f"Adding {len(new_documents)} new documents to the vector store")
+            self.logger.info(f"Adding {len(new_documents)} new documents to the vector store")
             await vs.aadd_documents(new_documents)
     
     def create_collection(self, collection_name, vector_dimension = 1536) -> bool:
@@ -326,20 +329,20 @@ class MemoryPersistence(MemoryStore):
         # Try to fetch the collection status
         try:
             result = self.qdrant_client.get_collection(collection_name)
-            print(f"created collection; '{result}' already exists.")
+            self.logger.info(f"created collection; '{result}' already exists.")
             return True
         except Exception as e:
             # If collection does not exist, an error will be thrown, so we create the collection
             if 'Not found: Collection' in str(e):
-                print(f"Collection '{collection_name}' not found. Creating it now...")
+                self.logger.info(f"Collection '{collection_name}' not found. Creating it now...")
 
                 self.qdrant_client.create_collection(
                     collection_name=collection_name,
                     vectors_config=models.VectorParams(size=vector_dimension, distance=models.Distance.COSINE)
                 )
 
-                print(f"Collection '{collection_name}' created successfully.")
+                self.logger.info(f"Collection '{collection_name}' created successfully.")
                 return True
             else:
-                print(f"Error while checking collection: {e}")
+                self.logger.error(f"Error while checking collection: {e}")
                 return False

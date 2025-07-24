@@ -1,4 +1,5 @@
 import uuid
+import os
 from abc import abstractmethod
 from typing import Any, Literal
 from langchain_openai import OpenAIEmbeddings
@@ -9,6 +10,7 @@ from langgraph.store.base import IndexConfig
 from langchain_core.documents import Document
 from fastembed import TextEmbedding
 from fastembed.common.model_description import PoolingType, ModelSource
+from .memory_log import get_logger
 
 TypeEmbeddingModel = Literal["openai", "ollama", "vllm"]
 TypeEmbeddingModelVs = Literal["local", "hf"]
@@ -30,6 +32,7 @@ class MemoryStore:
     collection_dim: int = 1536
     key_search : str = "metadata.thread"
     thread: str | None = str(uuid.uuid4()) 
+    logger = get_logger(name="memory_store", loki_url=os.getenv("LOKI_URL"))
 
     def __init__(self, **kwargs: Any) -> None:
         """
@@ -82,7 +85,7 @@ class MemoryStore:
             if self.model_embedding_type.lower() == 'local':
                 
                 if self.model_embedding_vs_path is None:
-                    print("model_embedding_path not set, using default local model path")
+                    self.logger.error("model_embedding_path not set, using default local model path")
                     raise ValueError("model_embedding_path must be set")
                 
                 TextEmbedding.add_custom_model(
@@ -99,7 +102,7 @@ class MemoryStore:
             elif self.model_embedding_vs_type.lower() == 'hf':
                 return TextEmbedding(model=self.model_embedding_vs_name)
         except Exception as e:
-            print(f"Errore durante il caricamento del modello di embedding per il database vettoriale: {e}")
+            self.logger.error(f"Errore durante il caricamento del modello di embedding per il database vettoriale: {e}")
             raise e
 
     def get_embedding_model(self):
@@ -115,31 +118,31 @@ class MemoryStore:
         try:
 
             if self.model_embedding_type is None:
-                print("model_embedding_type must be set")
+                self.logger.error("model_embedding_type must be set")
                 raise ValueError("model_embedding_type must be set")
 
             if self.model_embedding_name is None:
-                print("model_embedding_name must be set")
+                self.logger.error("model_embedding_name must be set")
                 raise ValueError("model_embedding_name must be set")
 
             if self.model_embedding_type.lower() == 'openai':
-                print("Using OpenAI embeddings")
+                self.logger.info("Using OpenAI embeddings")
                 return OpenAIEmbeddings(model=self.model_embedding_name)
             elif self.model_embedding_type.lower() == 'ollama':
-                print("Using Ollama embeddings")
+                self.logger.info("Using Ollama embeddings")
                 if self.model_embedding_url is None:
-                    print("model_embedding_url not set, using default Ollama base URL")
+                    self.logger.error("model_embedding_url not set, using default Ollama base URL")
                     raise ValueError("model_embedding_url must be set")
                 return OllamaEmbeddings(model=self.model_embedding_name, 
                                         base_url=self.model_embedding_url)
             elif self.model_embedding_type.lower() == 'vllm':
-                print("Using VLLM embeddings")
+                self.logger.info("Using VLLM embeddings")
                 if self.model_embedding_url is None:
-                    print("model_embedding_url not set, using default VLLM base URL")
+                    self.logger.error("model_embedding_url not set, using default VLLM base URL")
                     raise ValueError("model_embedding_url must be set")
                 return OpenAIEmbeddings(model=self.model_embedding_name, base_url=self.model_embedding_url, tiktoken_enabled=False)
         except Exception as e:
-            print(f"Errore durante il caricamento del modello di embedding: {e}")
+            self.logger.error(f"Errore durante il caricamento del modello di embedding: {e}")
             raise e
 
     def get_in_memory_store(self):
