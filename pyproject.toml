@@ -181,5 +181,9 @@ dependencies = [
     "zstandard>=0.23.0"
 ]
 
+[project.urls]
+Homepage = "https://gzileni.github.io/memory-agent"
+Repository = "https://github.com/gzileni/memory-agent"
+
 [tool.setuptools]
 packages = ["memory-agent"]  
