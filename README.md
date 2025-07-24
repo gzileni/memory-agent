@@ -1,4 +1,4 @@
-# [memory-agent](https://github.com/gzileni/memory-agent) `v1.0.46`
+# [memory-agent](https://github.com/gzileni/memory-agent) `v1.0.47`
 
 The library allows you to manage both [persistence](https://langchain-ai.github.io/langgraph/how-tos/persistence/) and [**memory**](https://langchain-ai.github.io/langgraph/concepts/memory/#what-is-memory) for a LangGraph agent.
 
@@ -65,13 +65,6 @@ This distinction affects both the architecture and the choice of databases used 
 ### Installation
 
 To install **memory-agent** via pip, run:
-
-```bash
-pip install memory-agent
-```
-
-Make sure you have Python ≥ 3.8 installed.  
-For the latest version, you can specify:
 
 ```bash
 pip install memory-agent
