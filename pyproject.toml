@@ -3,8 +3,8 @@ requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "memory_agent"
-version = "1.0.49"
+name = "memory-agent"
+version = "1.0.5"
 description = "A Python library for advanced memory management in AI agent applications"
 authors = [
     { name="Giuseppe Zileni", email="giuseppe.zileni@gmail.com" }
@@ -186,4 +186,4 @@ Homepage = "https://gzileni.github.io/memory-agent"
 Repository = "https://github.com/gzileni/memory-agent"
 
 [tool.setuptools]
-packages = ["memory-agent"]  
+packages = ["memory_agent"]  
