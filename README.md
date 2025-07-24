@@ -166,7 +166,7 @@ Two QDrant instances are available for use as a vector database: one synchronous
 
 ```python
 import os
-from qi_memory import MemoryPersistence
+from memory_agent import MemoryPersistence
 
 # Istanza sincrona di QDrant
 qdrant = MemoryPersistence(model_embedding_vs_name="BAAI/bge-large-en-v1.5", 
@@ -209,7 +209,7 @@ By default, QDrant automatically downloads text embedding models from Hugging Fa
 
 ```python
 import os
-from qi_memory import MemoryPersistence
+from memory_agent import MemoryPersistence
 
 # Istanza sincrona di QDrant
 qdrant = MemoryPersistence(model_embedding_vs_name="BAAI/bge-large-en-v1.5", 
