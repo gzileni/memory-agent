@@ -76,7 +76,9 @@ Below is a practical example of how to use the library to manage long-term memor
 
 ```python
 import os
-from memory_agent import MemoryCheckPointer, MemoryPersistence
+from memory_agent.memory_checkpointer import MemoryCheckPointer
+from memory_agent.memory_persistence import MemoryPersistence
+
 from typing import Annotated
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START
@@ -174,7 +176,7 @@ Two QDrant instances are available for use as a vector database: one synchronous
 
 ```python
 import os
-from memory_agent import MemoryPersistence
+from memory_agent.memory_persistence import MemoryPersistence
 
 # Istanza sincrona di QDrant
 qdrant = MemoryPersistence(model_embedding_vs_name="BAAI/bge-large-en-v1.5", 
@@ -217,7 +219,7 @@ By default, QDrant automatically downloads text embedding models from Hugging Fa
 
 ```python
 import os
-from memory_agent import MemoryPersistence
+from memory_agent.memory_persistence import MemoryPersistence
 
 # Istanza sincrona di QDrant
 qdrant = MemoryPersistence(model_embedding_vs_name="BAAI/bge-large-en-v1.5", 
