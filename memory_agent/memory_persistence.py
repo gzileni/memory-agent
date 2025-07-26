@@ -8,7 +8,7 @@ from qdrant_client import models, AsyncQdrantClient, QdrantClient
 from .memory import MemoryStore
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from memory_log import get_logger
+from .memory_log import get_logger
 
 
 class MemoryPersistence(MemoryStore):

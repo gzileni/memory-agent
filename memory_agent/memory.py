@@ -10,7 +10,7 @@ from langgraph.store.base import IndexConfig
 from langchain_core.documents import Document
 from fastembed import TextEmbedding
 from fastembed.common.model_description import PoolingType, ModelSource
-from memory_log import get_logger
+from .memory_log import get_logger
 
 TypeEmbeddingModel = Literal["openai", "ollama", "vllm"]
 TypeEmbeddingModelVs = Literal["local", "hf"]
