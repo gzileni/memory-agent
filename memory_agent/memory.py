@@ -140,11 +140,9 @@ class MemoryStore:
         try:
 
             if self.model_embedding_type is None:
-                self.logger.error("model_embedding_type must be set")
                 raise ValueError("model_embedding_type must be set")
 
             if self.model_embedding_name is None:
-                self.logger.error("model_embedding_name must be set")
                 raise ValueError("model_embedding_name must be set")
 
             if self.model_embedding_type.lower() == 'openai':
