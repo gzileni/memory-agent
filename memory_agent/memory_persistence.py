@@ -102,12 +102,6 @@ class MemoryPersistence(MemoryStore):
         """
         super().__init__(**kwargs)
         self.qdrant_url = kwargs.get("qdrant_url", None)
-        if self.qdrant_url is None:
-            msg = (
-                "Qdrant URL not provided. Please set the "
-                "'qdrant_url' parameter."
-            )
-            raise ValueError(msg)
         self.model_embedding_vs_type = kwargs.get(
             "model_embedding_vs_type", "hf"
         )
@@ -117,21 +111,32 @@ class MemoryPersistence(MemoryStore):
         self.model_embedding_vs_name = kwargs.get(
             "model_embedding_vs_name", "BAAI/bge-large-en-v1.5"
         )
-        if (
-            self.model_embedding_vs_type is None
-            and self.model_embedding_vs_name is None
-        ):
-            raise ValueError(
-                "Either 'model_embedding_vs_type' or "
-                "'model_embedding_vs_name' must be provided."
-            )
-        self.qdrant_client_async = AsyncQdrantClient(url=self.qdrant_url)
+        if self.qdrant_url is not None:
+            self.set_qdrant(self.qdrant_url)
+
+    def set_qdrant(
+        self,
+        qdrant_url: str
+    ):
+        """
+        Set the Qdrant URL for the client.
+
+        Args:
+            qdrant_url (str): The URL of the Qdrant server.
+        """
+        self.qdrant_url = qdrant_url
+        self.qdrant_client_async = AsyncQdrantClient(url=qdrant_url)
+        self.qdrant_client = QdrantClient(url=qdrant_url)
+
+        if not self.model_embedding_vs_name:
+            self.model_embedding_vs_name = "BAAI/bge-large-en-v1.5"
+
         self.qdrant_client_async.set_model(self.model_embedding_vs_name)
-        self.qdrant_client = QdrantClient(url=self.qdrant_url)
         self.qdrant_client.set_model(self.model_embedding_vs_name)
 
     async def get_vector_store(
-        self, collection: str | None = None
+        self, 
+        collection: str | None = None
     ) -> QdrantVectorStore:
         """
         Get or create a Qdrant vector store for the specified collection.
@@ -143,6 +148,12 @@ class MemoryPersistence(MemoryStore):
             QdrantVectorStore:
                 The Qdrant vector store for the specified collection.
         """
+
+        if self.qdrant_url is None:
+            raise ValueError(
+                "Qdrant URL is not set. Please provide a valid Qdrant URL."
+            )
+
         collection_name = (
             collection if collection else self.collection_name
         )
