@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memory_agent"
-version = "1.1.24"
+version = "1.1.25"
 description = "A Python library for advanced memory management in AI agent applications"
 authors = [
     { name="Giuseppe Zileni", email="giuseppe.zileni@gmail.com" }
@@ -72,7 +72,7 @@ dependencies = [
     "jaraco.functools>=4.1.0",
     "jiter>=0.9.0",
     "jmespath>=1.0.1",
-    "joblib>=1.5.1",
+    "joblib>=1.5.0",
     "json_repair>=0.39.1",
     "jsonpatch>=1.33",
     "jsonpointer>=3.0.0",
