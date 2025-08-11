@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memory_agent"
-version = "1.1.14"
+version = "1.1.15"
 description = "A Python library for advanced memory management in AI agent applications"
 authors = [
     { name="Giuseppe Zileni", email="giuseppe.zileni@gmail.com" }
@@ -104,8 +104,6 @@ dependencies = [
     "multidict>=6.4.4",
     "mypy_extensions>=1.1.0",
     "narwhals>=1.43.1",
-    "neo4j>=5.28.1",
-    "neo4j-graphrag>=1.7.0",
     "nest-asyncio>=1.6.0",
     "nh3>=0.2.21",
     "nltk>=3.9.1",
@@ -123,7 +121,7 @@ dependencies = [
     "pluggy>=1.6.0",
     "portalocker>=2.10.1",
     "propcache>=0.3.2",
-    "protobuf>=6.31.1",
+    "protobuf>=5.29.4",
     "psutil>=7.0.0",
     "py_rust_stemmers>=0.1.5",
     "pyaws-s3>=1.0.21",
