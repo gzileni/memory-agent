@@ -53,7 +53,7 @@ iniconfig==2.1.0
 jaraco.classes==3.4.0
 jaraco.context==6.0.1
 jaraco.functools==4.1.0
-jiter==0.10.0
+jiter==0.9.0
 jmespath==1.0.1
 joblib==1.5.1
 json_repair==0.39.1
