@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memory_agent"
-version = "1.1.22"
+version = "1.1.23"
 description = "A Python library for advanced memory management in AI agent applications"
 authors = [
     { name="Giuseppe Zileni", email="giuseppe.zileni@gmail.com" }
@@ -61,7 +61,7 @@ dependencies = [
     "httpcore>=1.0.9",
     "httpx>=0.28.1",
     "httpx-sse>=0.4.0",
-    "huggingface-hub>=0.33.0",
+    "huggingface-hub>=0.24.0",
     "humanfriendly>=10.0",
     "hyperframe>=6.1.0",
     "id>=1.5.0",
