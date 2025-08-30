@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memory_agent"
-version = "2.1.0"
+version = "2.1.1"
 description = "A Python library for advanced memory management in AI agent applications"
 authors = [
     { name="Giuseppe Zileni", email="giuseppe.zileni@gmail.com" }
@@ -186,4 +186,5 @@ Homepage = "https://gzileni.github.io/memory-agent"
 Repository = "https://github.com/gzileni/memory-agent"
 
 [tool.setuptools]
-packages = ["memory_agent"]  
+packages = ["memory_agent", "memory_agent.ollama", "memory_agent.openai"]
+
