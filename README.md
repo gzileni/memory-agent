@@ -1,8 +1,8 @@
 # memory-agent  
 
-![View on GitHub](https://img.shields.io/badge/View%20on-GitHub-181717?style=for-the-badge&logo=github)(https://github.com/gzileni/memory-agent)  
-![GitHub stars](https://img.shields.io/github/stars/gzileni/memory-agent?style=social)(https://github.com/gzileni/memory-agent/stargazers)  
-![GitHub forks](https://img.shields.io/github/forks/gzileni/memory-agent?style=social)(https://github.com/gzileni/memory-agent/network)  
+[![View on GitHub](https://img.shields.io/badge/View%20on-GitHub-181717?style=for-the-badge&logo=github)](https://github.com/gzileni/memory-agent)  
+[![GitHub stars](https://img.shields.io/github/stars/gzileni/memory-agent?style=social)](https://github.com/gzileni/memory-agent/stargazers)  
+[![GitHub forks](https://img.shields.io/github/forks/gzileni/memory-agent?style=social)](https://github.com/gzileni/memory-agent/network)  
 
 The library allows you to manage both [persistence](https://langchain-ai.github.io/langgraph/how-tos/persistence/) and [**memory**](https://langchain-ai.github.io/langgraph/concepts/memory/#what-is-memory) for a LangGraph agent.  
 
