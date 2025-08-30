@@ -2,6 +2,28 @@
 
 All significant changes to the project are documented here.
 
+## [2.1.0] - 2025-08-30
+
+### Added
+- Introduced `AgentOllama` and `AgentOpenAI` classes for better integration with respective models.
+- Implemented a new `MemoryAgent` class to manage memory operations and interactions.
+- Added a new `State` class to track summaries and improve state management.
+- Updated dependencies in `pyproject.toml` and `requirements.txt` for compatibility and new features.
+
+### Changed
+- Refactored memory agent architecture and enhanced functionality.
+- Removed the entrypoint script for Qdrant as it is no longer needed.
+- Updated `MemoryStore` class to improve thread handling and renamed methods for clarity.
+- Refactored `MemoryPersistence` class to align with new naming conventions.
+
+### Breaking changes
+- Significant refactor: previous Qdrant entrypoint and legacy memory flow removed. Ensure you migrate custom scripts and integrations to use the new agent classes and state management flow.
+
+### Notes
+- Version bumped to 2.1.0 to reflect substantial improvements.
+- See README and migration docs for update instructions and compatibility notes.
+
+
 ## [2.0.0] - 2025-08-20
 
 ### Added
