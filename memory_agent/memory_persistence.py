@@ -184,7 +184,7 @@ class MemoryPersistence(MemoryStore):
             url=self.qdrant_url
         )
 
-    def get_client_async(self) -> AsyncQdrantClient:
+    def client_async(self) -> AsyncQdrantClient:
         """
         Get the Qdrant client.
 
@@ -193,7 +193,7 @@ class MemoryPersistence(MemoryStore):
         """
         return self.qdrant_client_async
 
-    def get_client(self) -> QdrantClient:
+    def client(self) -> QdrantClient:
         """
         Get the Qdrant client.
 
@@ -259,7 +259,7 @@ class MemoryPersistence(MemoryStore):
             return
 
         metadata: dict = {
-            "thread": thread if thread else self.thread,
+            "thread": thread if thread else self.thread_id,
         }
         if custom_metadata is not None:
             metadata["custom"] = custom_metadata

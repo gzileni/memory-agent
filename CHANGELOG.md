@@ -2,7 +2,7 @@
 
 All significant changes to the project are documented here.
 
-## [2.0.0] - 2025-08-30
+## [2.0.0] - 2025-08-20
 
 ### Added
 - Support for both CPU and GPU Qdrant builds via Dockerfile.

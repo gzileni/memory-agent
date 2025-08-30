@@ -13,6 +13,11 @@ class MemoryOllama(MemoryPersistence):
     def __init__(self, **kwargs: Any) -> None:
         """
         Initializes an instance of MemoryAgent with the provided parameters.
+        Args:
+            model_embedding_name (str): The name of the model to use
+                for embeddings.
+            model_embedding_url (str): The URL of the model to use
+                for embeddings.
         """
         super().__init__(**kwargs)
 
@@ -64,7 +69,13 @@ class MemoryOllama(MemoryPersistence):
             self.logger.error(msg)
             raise e
 
-    def get_config(self) -> IndexConfig:
+    def memory_config(self) -> IndexConfig:
+        """
+        Get the memory configuration for the agent.
+
+        Returns:
+            IndexConfig: The memory configuration.
+        """
         return {
             "embed": self.model_embedding,
             "dims": self.collection_dim,

@@ -13,8 +13,11 @@ class MemoryStore:
     input and output.
     """
 
-    thread: str | None = str(uuid.uuid4())
-    logger = get_logger(name="memory_store", loki_url=os.getenv("LOKI_URL"))
+    thread_id: str | None = str(uuid.uuid4())
+    logger = get_logger(
+        name="memory_store",
+        loki_url=os.getenv("LOKI_URL")
+    )
 
     def __init__(self, **kwargs: Any) -> None:
         """
@@ -40,7 +43,7 @@ class MemoryStore:
                 - model_embedding_path (str, optional):
                     The path to the model embedding file.
         """
-        self.thread = kwargs.get("thread", self.thread)
+        self.thread_id = kwargs.get("thread_id", self.thread_id)
 
     @abstractmethod
     def get_embedding_model(self):
@@ -58,7 +61,7 @@ class MemoryStore:
         pass
 
     @abstractmethod
-    def get_config(self) -> IndexConfig:
+    def memory_config(self) -> IndexConfig:
         """
         Get the configuration for the in-memory store.
 
@@ -67,11 +70,11 @@ class MemoryStore:
         """
         pass
 
-    def get_in_memory_store(self):
+    def in_memory_store(self) -> InMemoryStore:
         """
         Get the in-memory store.
 
         Returns:
             InMemoryStore: The in-memory store.
         """
-        return InMemoryStore(index=self.get_config())
+        return InMemoryStore(index=self.memory_config())
