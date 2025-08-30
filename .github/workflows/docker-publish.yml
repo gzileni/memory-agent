@@ -79,7 +79,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cpu
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            PLATFORM=CPU
+            PLATFORM=cpu
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
