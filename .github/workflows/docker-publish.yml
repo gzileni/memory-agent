@@ -119,4 +119,4 @@ jobs:
         env:
           TAGS: ${{ steps.meta.outputs.tags }},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:gpu
           DIGEST: ${{ steps.build-and-push-gpu.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+        run: echo "${TAGS}" | tr ',' '\n' | xargs -I {} cosign sign --yes {}@${DIGEST}
