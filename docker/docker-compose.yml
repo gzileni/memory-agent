@@ -1,49 +1,95 @@
 
 services:
 
-  memory-redis:
-    container_name: memory-redis
+  memory-agent:
+    container_name: memory-agent
     restart: always
-    image: redis:7
+    image: ghcr.io/gzileni/memory-agent:main
     ports:
-      - "6379:6379"
-    volumes:
-      - memory-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 2s
-      retries: 30
-    networks:
-      - memory-network
-
-  memory-qdrant:
-    container_name: memory-qdrant
-    platform: linux/amd64
-    image: qdrant/qdrant:v1.13.4
-    restart: always
-    ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "8000:8000"
+      - "6379:6379"   # Redis
+      - "6333:6333"   # QDrant
+      - "6334:6334"   # QDrant
     expose:
-      - 6333
-      - 6334
-      - 6335
-    volumes:
-      - memory-qdrant-data:/qdrant/storage:z
-      - ./qdrant/config.yml:/qdrant/config.yml:ro
+      - "8000"
+      - "6379"
+      - "6333"
+      - "6334"
     networks:
-      - memory-network
+      - memory-agent-network
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COLLECTION_NAME=${COLLECTION_NAME}
+      - MODEL_EMBEDDING=${MODEL_EMBEDDING}
+      - LLM_URL=${LLM_URL}
+      - LOKI_URL=http://kgrag-mcp-loki:3100/loki/api/v1/push
+    volumes:
+      - qdrant_data:/qdrant/storage:z
+      - redis_data:/data
+
+  memory-agent-loki:
+    container_name: memory-agent-loki
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - memory-agent-network
+
+  memory-agent-promtail:
+    container_name: memory-agent-promtail
+    image: grafana/promtail:latest
+    volumes:
+      - loki_log:/var/log
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - memory-agent-network
+
+  memory-agent-grafana:
+    container_name: memory-agent-grafana
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_FEATURE_TOGGLES_ENABLE=alertingSimplifiedRouting,alertingQueryAndExpressionsStepMode
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
+        apiVersion: 1
+        datasources:
+        - name: Loki
+          type: loki
+          access: proxy 
+          orgId: 1
+          url: http://memory-agent-loki:3100
+          basicAuth: false
+          isDefault: true
+          version: 1
+          editable: false
+        EOF
+        /run.sh
+    image: grafana/grafana:latest
+    volumes:
+      - grafana_data:/var/lib/grafana  # Volume persistente per i dati di Grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - memory-agent-network
 
 volumes:
-  memory-qdrant-data:
-  memory-redis-data:
+  qdrant_data:
+  redis_data:
+  grafana_data:
+  loki_log:
 
 networks:
-  memory-network:
-    name: memory-network
+  memory-agent-network:
+    name: memory-agent-network
     driver: bridge
     ipam:
       driver: default
       config:
-        - subnet: 172.16.110.0/24
+        - subnet: 172.16.99.0/24

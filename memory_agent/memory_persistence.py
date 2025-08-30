@@ -1,6 +1,5 @@
-import os
 import uuid
-from typing import Any
+from typing import Any, Literal
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client.http.models import Distance, VectorParams
 from langchain_core.documents import Document
@@ -8,7 +7,10 @@ from qdrant_client import models, AsyncQdrantClient, QdrantClient
 from .memory import MemoryStore
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from .memory_log import get_logger
+from fastembed.common.model_description import PoolingType, ModelSource
+from fastembed import TextEmbedding
+
+TypeEmbeddingModelVs = Literal["local", "hf"]
 
 
 class MemoryPersistence(MemoryStore):
@@ -19,75 +21,21 @@ class MemoryPersistence(MemoryStore):
     managing collections, adding and searching documents, and handling
     vector stores.
 
-    Attributes:
-        qdrant_url (str): The URL of the Qdrant server.
-        qdrant_client_async (AsyncQdrantClient):
-            Asynchronous Qdrant client instance.
-        qdrant_client (QdrantClient):
-            Synchronous Qdrant client instance.
-        model_embedding_vs_type (str):
-            Type of embedding model to use for vector storage.
-        model_embedding_vs_path (str | None):
-            Optional path to a custom embedding model.
-        model_embedding_vs_name (str):
-            Name of the embedding model to use.
-
-    Methods:
-        __init__(**kwargs):
-            Initializes the MemoryPersistence instance with Qdrant connection
-            and embedding model configuration.
-        async get_vector_store(collection: str | None = None)
-            Retrieves or creates a Qdrant vector store for a specified
-            collection.
-            Retrieves or creates a Qdrant vector store for a specified
-                collection.
-        get_client_async() -> AsyncQdrantClient:
-            Returns the asynchronous Qdrant client.
-        get_client() -> QdrantClient:
-            Returns the synchronous Qdrant client.
-        async search_filter_async(
-            query: str, metadata_value: str, collection: str | None = None
-        ):
-            Performs a similarity search in Qdrant with metadata filtering.
-        async save_async(
-            last_message: str,
-            thread: str | None = None,
-            custom_metadata: dict[str, Any] | None = None,
-            collection: str | None = None
-        ):
-            Saves a message as a document in the Qdrant vector store.
-        async delete_collection_async(collection: str):
-            Asynchronously deletes a collection from Qdrant.
-        delete_collection(collection: str):
-            Synchronously deletes a collection from Qdrant.
-        async retriever(urls: list[str], **kwargs) -> Any:
-            Loads documents from URLs, splits them, adds them to Qdrant,
-            and returns a retriever.
-        async create_collection_async(
-            collection_name, vector_dimension=1536
-        ) -> bool:
-            Asynchronously creates a collection in Qdrant if it does not exist.
-        async add_documents_async(
-            documents: list[Document], collection: str | None = None
-        ):
-            Adds documents to the vector store, avoiding duplicates.
-        create_collection(collection_name, vector_dimension=1536) -> bool:
-            Synchronously creates a collection in Qdrant if it does not exist.
-        ValueError: If required configuration parameters are missing.
-        Exception: For errors during collection or document operations.
-
     Usage:
         This class is intended to be used as a backend for AI agents requiring
         persistent, searchable memory using Qdrant as the vector database.
     """
 
+    model_embedding_vs_path: str | None = None
+    model_embedding_vs_type: TypeEmbeddingModelVs = "hf"
+    model_embedding_vs_name: str = "BAAI/bge-large-en-v1.5"
+    model_embedding_vs: TextEmbedding | None = None
+    collection_name: str
+    collection_dim: int = 1536
+    key_search: str | None = None
     qdrant_url: str | None = None
     qdrant_client_async: AsyncQdrantClient
     qdrant_client: QdrantClient
-    logger = get_logger(
-        name="memory_persistence",
-        loki_url=os.getenv("LOKI_URL")
-    )
 
     def __init__(self, **kwargs: Any) -> None:
         """
@@ -101,7 +49,15 @@ class MemoryPersistence(MemoryStore):
                 - qdrant_url (str, optional): The URL of the Qdrant server.
         """
         super().__init__(**kwargs)
+
+        self.key_search = kwargs.get("key_search", "metadata.thread")
         self.qdrant_url = kwargs.get("qdrant_url", None)
+
+        self.collection_name = kwargs.get("collection_name", "memory_store")
+        if self.collection_name is None:
+            raise ValueError("collection_name must be set")
+        self.collection_dim = kwargs.get("collection_dim", 1536)
+
         self.model_embedding_vs_type = kwargs.get(
             "model_embedding_vs_type", "hf"
         )
@@ -113,6 +69,50 @@ class MemoryPersistence(MemoryStore):
         )
         if self.qdrant_url is not None:
             self.set_qdrant(self.qdrant_url)
+
+    def get_embedding_model_vs(self) -> Any:
+        """
+        Get the language model_embedding_name to use for generating text.
+
+        Returns:
+            Any: The language model_embedding_name to use.
+        Raises:
+            ValueError: If the model_embedding_type or
+                model_embedding_name is not set.
+            Exception: If there is an error during the loading
+                of the embedding model.
+        """
+        try:
+
+            if self.model_embedding_vs_name is None:
+                raise ValueError("model_embedding_vs_name must be set")
+
+            if self.model_embedding_vs_type.lower() == 'local':
+                if self.model_embedding_vs_path is None:
+                    msg = (
+                        "model_embedding_path not set, "
+                        "using default local model path"
+                    )
+                    self.logger.error(msg)
+                    raise ValueError("model_embedding_path must be set")
+                TextEmbedding.add_custom_model(
+                    model=self.model_embedding_vs_name,
+                    pooling=PoolingType.MEAN,
+                    normalization=True,
+                    sources=ModelSource(hf=self.model_embedding_vs_name),
+                    dim=384,
+                    model_file=self.model_embedding_vs_path,
+                )
+                return TextEmbedding(model=self.model_embedding_vs_name)
+            elif self.model_embedding_vs_type.lower() == 'hf':
+                return TextEmbedding(model=self.model_embedding_vs_name)
+        except Exception as e:
+            msg = (
+                f"Errore durante il caricamento del modello di embedding "
+                f"per il database vettoriale: {e}"
+            )
+            self.logger.error(msg)
+            raise e
 
     def set_qdrant(
         self,
@@ -135,7 +135,7 @@ class MemoryPersistence(MemoryStore):
         self.qdrant_client.set_model(self.model_embedding_vs_name)
 
     async def get_vector_store(
-        self, 
+        self,
         collection: str | None = None
     ) -> QdrantVectorStore:
         """
@@ -222,7 +222,7 @@ class MemoryPersistence(MemoryStore):
         """
         metadata_query = [
             models.FieldCondition(
-                key=self.key_search,
+                key=str(self.key_search),
                 match=models.MatchValue(value=metadata_value)
             )
         ]

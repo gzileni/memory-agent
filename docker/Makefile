@@ -1,12 +1,12 @@
 .PHONY: run-qdrant
 
 run:
-	echo "Running stack agent ..."
-	docker-compose -p memory up -d
+	echo "Running stack memory agent ..."
+	docker-compose --env-file .env -p memory up -d
 
 stop:
-	echo "Stopping qdrant ..."
-	docker-compose down
+	echo "Stopping memory agent ..."
+	docker-compose --env-file .env -p memory down
 
 restart: stop run
 	echo "All services are restarted"
