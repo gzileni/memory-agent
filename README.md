@@ -85,7 +85,7 @@ pip install --upgrade huggingface_hub
 
 ```python
 import asyncio
-from agent_openai import AgentOpenAI
+from memory_agent.openai import AgentOpenAI
 import os
 
 async def main():
@@ -111,7 +111,7 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from agent_openai import AgentOpenAI
+from memory_agent.openai import AgentOpenAI
 import os
 
 async def main():
@@ -158,7 +158,7 @@ asyncio.run(main())
 
 ```python
 import asyncio
-from agent_ollama import AgentOllama
+from memory_agent.ollama import AgentOllama
 
 async def main():
     agent = AgentOllama(
