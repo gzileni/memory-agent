@@ -2,6 +2,27 @@
 
 All significant changes to the project are documented here.
 
+## [2.1.2] - 2025-08-30
+
+### Added
+- Added functionality to extract the model from the Ollama server.
+- New packages added to the project for improved compatibility and features.
+
+### Changed
+- Updated imports to reflect the new `memory_agent` package structure.
+- Updated README title to include link to docker-compose file.
+
+### Fixed
+- Updated CHANGELOG to include new classes and significant changes for v2.1.0.
+- Translated CHANGELOG to English and updated sections for consistency.
+
+### Chore
+- Removed Release Drafter configuration file.
+
+### Notes
+- Version bumped to 2.1.2 to reflect compatibility and feature improvements.
+- See README for latest setup instructions.
+
 ## [2.1.0] - 2025-08-30
 
 ### Added
