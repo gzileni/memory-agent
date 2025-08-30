@@ -21,6 +21,8 @@ from .state import State
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import SecretStr
+from langchain.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableSerializable
 
 MemoryAgentType = Literal["hotpath", "background"]
 
@@ -617,3 +619,10 @@ class MemoryAgent:
                 }
             )
             raise e
+
+    def chain(self, prompt: ChatPromptTemplate) -> RunnableSerializable:
+        """
+        Get the chain of prompts for the agent.
+        """
+        llm = self.model()
+        return prompt | llm
