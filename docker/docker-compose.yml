@@ -1,10 +1,13 @@
 
 services:
 
-  memory-agent:
-    container_name: memory-agent
+  memory-agent-cpu:
+    container_name: memory-agent-cpu
+    profiles:
+      - cpu
+      - all
     restart: always
-    image: ghcr.io/gzileni/memory-agent:main
+    image: ghcr.io/gzileni/memory-agent:cpu
     ports:
       - "8000:8000"
       - "6379:6379"   # Redis
@@ -16,7 +19,36 @@ services:
       - "6333"
       - "6334"
     networks:
-      - memory-agent-network
+      - memory-network
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COLLECTION_NAME=${COLLECTION_NAME}
+      - MODEL_EMBEDDING=${MODEL_EMBEDDING}
+      - LLM_URL=${LLM_URL}
+      - LOKI_URL=http://kgrag-mcp-loki:3100/loki/api/v1/push
+    volumes:
+      - qdrant_data:/qdrant/storage:z
+      - redis_data:/data
+
+  memory-agent-gpu:
+    container_name: memory-agent-gpu
+    profiles:
+      - gpu
+      - all
+    restart: always
+    image: ghcr.io/gzileni/memory-agent:gpu
+    ports:
+      - "8000:8000"
+      - "6379:6379"   # Redis
+      - "6333:6333"   # QDrant
+      - "6334:6334"   # QDrant
+    expose:
+      - "8000"
+      - "6379"
+      - "6333"
+      - "6334"
+    networks:
+      - memory-network
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - COLLECTION_NAME=${COLLECTION_NAME}
@@ -29,24 +61,30 @@ services:
 
   memory-agent-loki:
     container_name: memory-agent-loki
+    profiles:
+      - all
     image: grafana/loki:latest
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     networks:
-      - memory-agent-network
+      - memory-network
 
   memory-agent-promtail:
     container_name: memory-agent-promtail
+    profiles:
+      - all
     image: grafana/promtail:latest
     volumes:
       - loki_log:/var/log
     command: -config.file=/etc/promtail/config.yml
     networks:
-      - memory-agent-network
+      - memory-network
 
   memory-agent-grafana:
     container_name: memory-agent-grafana
+    profiles:
+      - all
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_AUTH_ANONYMOUS_ENABLED=true
@@ -77,7 +115,7 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - memory-agent-network
+      - memory-network
 
 volumes:
   qdrant_data:
@@ -86,8 +124,8 @@ volumes:
   loki_log:
 
 networks:
-  memory-agent-network:
-    name: memory-agent-network
+  memory-network:
+    name: memory-network
     driver: bridge
     ipam:
       driver: default
