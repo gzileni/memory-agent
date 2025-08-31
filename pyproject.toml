@@ -196,5 +196,5 @@ Homepage = "https://gzileni.github.io/memory-agent"
 Repository = "https://github.com/gzileni/memory-agent"
 
 [tool.setuptools]
-packages = ["memory_agent", "memory_agent.ollama", "memory_agent.openai"]
+packages = ["memory_agent", "memory_agent.ollama", "memory_agent.openai", "memory_agent.kgrag"]
 
