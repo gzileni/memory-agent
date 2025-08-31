@@ -5,7 +5,6 @@ services:
     container_name: memory-agent-cpu
     profiles:
       - cpu
-      - all
     restart: always
     image: ghcr.io/gzileni/memory-agent:cpu
     ports:
@@ -34,7 +33,6 @@ services:
     container_name: memory-agent-gpu
     profiles:
       - gpu
-      - all
     restart: always
     image: ghcr.io/gzileni/memory-agent:gpu
     ports:

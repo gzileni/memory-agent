@@ -1,12 +1,19 @@
-.PHONY: run-qdrant
+.PHONY: run stop restart
+
+PLATFORM ?= cpu
+
+ifeq ($(filter $(PLATFORM),cpu gpu),)
+$(error PLATFORM must be 'cpu' or 'gpu' (got '$(PLATFORM)'))
+endif
 
 run:
-	echo "Running stack memory agent ..."
-	docker-compose --env-file .env -p memory up -d
+	@echo "Running stack mcp server ... (platform=$(PLATFORM))"
+	@docker-compose -p memory-agent --profiles all --profiles $(PLATFORM) pull
+	@docker-compose -p memory-agent --profiles all --profiles $(PLATFORM) up -d
 
 stop:
-	echo "Stopping memory agent ..."
-	docker-compose --env-file .env -p memory down
+	@echo "Stopping mcp server ... (platform=$(PLATFORM))"
+	@docker-compose -p memory-agent --profiles all --profiles $(PLATFORM) down
 
 restart: stop run
-	echo "All services are restarted"
+	@echo "All services are restarted (platform=$(PLATFORM))"
