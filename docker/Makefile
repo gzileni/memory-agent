@@ -8,12 +8,12 @@ endif
 
 run:
 	@echo "Running stack mcp server ... (platform=$(PLATFORM))"
-	@docker-compose -p memory-agent --profiles all --profiles $(PLATFORM) pull
-	@docker-compose -p memory-agent --profiles all --profiles $(PLATFORM) up -d
+	@docker-compose -p memory-agent --profile all --profiles $(PLATFORM) pull
+	@docker-compose -p memory-agent --profile all --profiles $(PLATFORM) up -d
 
 stop:
 	@echo "Stopping mcp server ... (platform=$(PLATFORM))"
-	@docker-compose -p memory-agent --profiles all --profiles $(PLATFORM) down
+	@docker-compose -p memory-agent --profile all --profiles $(PLATFORM) down
 
 restart: stop run
 	@echo "All services are restarted (platform=$(PLATFORM))"
