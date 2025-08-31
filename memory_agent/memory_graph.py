@@ -16,7 +16,7 @@ from langchain_community.document_loaders import (CSVLoader,
                                                   PyPDFLoader,
                                                   JSONLoader)
 from memory_agent.memory_log import get_metadata
-from kgrag import (
+from memory_agent.kgrag import (
     GraphComponents,
     AGENT_PROMPT,
     parser_prompt,
