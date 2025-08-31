@@ -32,22 +32,7 @@ Persistent volumes are defined for Qdrant, Redis, Grafana and Promtail logs.
 
 2. Edit `.env` and set your real values (OpenAI API key, model, etc).
 
-3. Start the stack:
-    `docker compose up -d`
-    or, if you use the standalone binary:
-    `docker-compose up -d`
-
-4. Check logs:
-    `docker compose logs -f memory-agent`
-    `docker compose logs -f memory-agent-grafana`
-
-5. Stop and remove containers (optionally remove volumes):
-    `docker compose down`
-    `docker compose down -v  # also remove named volumes`
-
-or 
-
-`make run`
+3. Start the stack: `make run PLATFORM=gpu` or `make run PLATFORM=cpu`
 
 ## Environment variables
 
