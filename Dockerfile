@@ -46,3 +46,6 @@ RUN apt-get update && \
         python3-pip \
         python3-venv \
     && rm -rf /var/lib/apt/lists/*
+
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
