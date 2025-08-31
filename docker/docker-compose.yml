@@ -5,6 +5,7 @@ services:
     container_name: memory-agent-cpu
     profiles:
       - cpu
+      - dev
     restart: always
     image: ghcr.io/gzileni/memory-agent:cpu
     ports:
@@ -12,11 +13,15 @@ services:
       - "6379:6379"   # Redis
       - "6333:6333"   # QDrant
       - "6334:6334"   # QDrant
+      - "7474:7474" # HTTP - Neo4j
+      - "7687:7687" # Bolt - Neo4J
     expose:
       - "8000"
       - "6379"
       - "6333"
       - "6334"
+      - "7474"
+      - "7687"
     networks:
       - memory-network
     environment:
@@ -28,6 +33,7 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage:z
       - redis_data:/data
+      - neo4j_data:/var/lib/neo4j/data
 
   memory-agent-gpu:
     container_name: memory-agent-gpu
@@ -40,11 +46,15 @@ services:
       - "6379:6379"   # Redis
       - "6333:6333"   # QDrant
       - "6334:6334"   # QDrant
+      - "7474:7474" # HTTP - Neo4j
+      - "7687:7687" # Bolt - Neo4J
     expose:
       - "8000"
       - "6379"
       - "6333"
       - "6334"
+      - "7474"
+      - "7687"
     networks:
       - memory-network
     environment:
@@ -56,11 +66,13 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage:z
       - redis_data:/data
+      - neo4j_data:/var/lib/neo4j/data
 
   memory-agent-loki:
     container_name: memory-agent-loki
     profiles:
       - all
+      - dev
     image: grafana/loki:latest
     ports:
       - "3100:3100"
@@ -72,6 +84,7 @@ services:
     container_name: memory-agent-promtail
     profiles:
       - all
+      - dev
     image: grafana/promtail:latest
     volumes:
       - loki_log:/var/log
@@ -83,6 +96,7 @@ services:
     container_name: memory-agent-grafana
     profiles:
       - all
+      - dev
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_AUTH_ANONYMOUS_ENABLED=true
@@ -120,6 +134,7 @@ volumes:
   redis_data:
   grafana_data:
   loki_log:
+  neo4j_data:
 
 networks:
   memory-network:
