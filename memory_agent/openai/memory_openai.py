@@ -1,12 +1,12 @@
 import os
-from memory_agent.memory_persistence import MemoryPersistence
+from memory_agent.memory_graph import MemoryGraph
 from typing import Any
 from langchain_openai import OpenAIEmbeddings
 from langgraph.store.base import IndexConfig
 from pydantic import SecretStr
 
 
-class MemoryOpenAI(MemoryPersistence):
+class MemoryOpenAI(MemoryGraph):
     """
     Memory agent for OpenAI embeddings.
     Args:

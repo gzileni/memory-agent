@@ -16,6 +16,10 @@ FROM base_${PLATFORM} AS final
 EXPOSE 6333 6334
 
 ENV \
+  NEO4J_PLUGINS='["apoc"]' \
+  NEO4J_apoc_export_file_enabled=true \
+  NEO4J_apoc_import_file_enabled=true \
+  NEO4J_apoc_import_file_use__neo4j__config=true \
   VECTORDB_SENTENCE_TYPE="hf" \
   VECTORDB_SENTENCE_MODEL="BAAI/bge-small-en-v1.5" \
   QDRANT_URL="http://localhost:6333" \
@@ -37,6 +41,16 @@ COPY qdrant.yml /etc/qdrant/config.yml
 
 # Redis port
 EXPOSE 6379
+
+# Neo4j Installation
+RUN wget -O - https://debian.neo4j.com/neotechnology.gpg.key | apt-key add -
+RUN echo 'deb https://debian.neo4j.com stable 5' | tee /etc/apt/sources.list.d/neo4j.list && \
+    apt-get update
+RUN apt-get install neo4j -y
+COPY neo4j.conf /etc/neo4j/neo4j.conf
+
+# Neo4J ports
+EXPOSE 7474 7687
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

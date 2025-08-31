@@ -1,10 +1,10 @@
-from memory_agent.memory_persistence import MemoryPersistence
+from memory_agent.memory_graph import MemoryGraph
 from typing import Any
 from langchain_ollama import OllamaEmbeddings
 from langgraph.store.base import IndexConfig
 
 
-class MemoryOllama(MemoryPersistence):
+class MemoryOllama(MemoryGraph):
 
     model_embedding: OllamaEmbeddings
     model_embedding_name: str | None = None

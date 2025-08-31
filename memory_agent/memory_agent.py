@@ -89,6 +89,11 @@ class MemoryAgent:
         self.thread_id = kwargs.get("thread_id", self.thread_id)
         msg = "Initializing MemoryAgent with thread_id: %s"
         self.logger.info(msg, self.thread_id)
+
+        self.model_name = kwargs.get("model_name", "llama3.1")
+        self.model_provider = kwargs.get("model_provider", "ollama")
+        self.base_url = kwargs.get("base_url", None)
+
         self.memory_agent_type = kwargs.get(
             "memory_agent_type",
             self.memory_agent_type
