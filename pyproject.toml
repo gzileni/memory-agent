@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memory_agent"
-version = "3.0.2"
+version = "3.0.3"
 description = "A Python library for advanced memory management in AI agent applications"
 authors = [
     { name="Giuseppe Zileni", email="giuseppe.zileni@gmail.com" }
@@ -131,7 +131,7 @@ dependencies = [
     "pluggy >= 1.6.0",
     "portalocker >= 2.10.1",
     "propcache >= 0.3.2",
-    "protobuf >= 5.29.4",
+    "protobuf >= 4.25.8",
     "psutil >= 7.0.0",
     "py_rust_stemmers >= 0.1.5",
     "pyaws-s3 >= 1.0.28",
