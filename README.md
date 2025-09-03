@@ -249,3 +249,5 @@ See [Docker README](./docker/README.md) for instructions on running Redis, Qdran
 - **Store/Checkpointer**: if using Redis or another backend, verify `host_persistence_config`.  
 
 ---
+
+Semantic Memory: https://langchain-ai.github.io/langmem/guides/extract_semantic_memories/#when-to-use-semantic-memories

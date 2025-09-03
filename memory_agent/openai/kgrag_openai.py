@@ -1,7 +1,5 @@
 from .agent_openai import AgentOpenAI
 from .memory_openai import MemoryOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableSerializable
 
 
 class KGragOpenAI(MemoryOpenAI):
@@ -18,14 +16,6 @@ class KGragOpenAI(MemoryOpenAI):
         """
         super().__init__(**kwargs)
         self.openai_agent = AgentOpenAI(**kwargs)
-
-    def chain(self, prompt: ChatPromptTemplate) -> RunnableSerializable:
-        """
-        Get the chain for the OpenAI agent.
-        Args:
-            prompt (ChatPromptTemplate): The prompt to use for the chain.
-        """
-        return self.openai_agent.chain(prompt)
 
     def embeddings(
         self,

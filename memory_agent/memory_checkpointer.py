@@ -260,7 +260,10 @@ class MemoryCheckpointer(BaseCheckpointSaver):
         )
 
     async def adelete_by_thread_id(
-        self, thread_id: str, checkpoint_ns: str = "", filter_minutes: int = 0
+        self,
+        thread_id: str,
+        checkpoint_ns: str = "",
+        filter_minutes: int = 0
     ) -> None:
         """
         Delete all checkpoints for a specific thread ID and namespace

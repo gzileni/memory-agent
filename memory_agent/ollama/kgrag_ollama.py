@@ -1,7 +1,5 @@
 from .memory_ollama import MemoryOllama
 from .agent_ollama import AgentOllama
-from langchain.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableSerializable
 
 
 class KGragOllama(MemoryOllama):
@@ -17,14 +15,6 @@ class KGragOllama(MemoryOllama):
         """
         super().__init__(**kwargs)
         self.ollama_agent = AgentOllama(**kwargs)
-
-    def chain(self, prompt: ChatPromptTemplate) -> RunnableSerializable:
-        """
-        Get the chain for the Ollama agent.
-        Args:
-            prompt (ChatPromptTemplate): The prompt to use for the chain.
-        """
-        return self.ollama_agent.chain(prompt)
 
     def embeddings(
         self,

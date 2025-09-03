@@ -1,128 +1,32 @@
-import uuid
-import os
-from typing import AsyncIterable, Any, Optional, Literal
+from typing import AsyncIterable, Any, Optional
 from langgraph.prebuilt import create_react_agent
 from langchain_core.runnables import RunnableConfig
 from langmem.short_term import SummarizationNode
 from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.graph.state import CompiledStateGraph
 from .memory_checkpointer import MemoryCheckpointer
-from langgraph.config import get_store
-from .memory_log import get_logger, get_metadata
+from .memory_log import get_metadata
 from langmem import (
     create_manage_memory_tool,
     create_search_memory_tool,
-    create_memory_store_manager,
-    ReflectionExecutor
 )
-from abc import abstractmethod
-from langgraph.store.memory import InMemoryStore
+from .memory_manager import MemoryManager
 from .state import State
-from langchain.chat_models import init_chat_model
-from langchain_core.language_models.chat_models import BaseChatModel
-from pydantic import SecretStr
-from langchain.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnableSerializable
-
-MemoryAgentType = Literal["hotpath", "background"]
 
 
-class MemoryAgent:
+class MemoryAgent(MemoryManager):
     """
     A memory agent for managing and utilizing memory in AI applications.
-    Args:
-        **kwargs: Arbitrary keyword arguments for configuration.
-            - thread_id (str): Unique identifier for the thread.
-            - host_persistence_config (dict): Configuration for
-                host persistence.
-            - max_recursion_limit (int): Maximum recursion limit for the agent.
-            - filter_minutes (int): Minutes to filter old checkpoints.
-            - model_name (str): Name of the language model to use.
-            - model_provider (str): Provider of the language model.
-            - base_url (str, optional): Base URL for the model API.
-            - temperature (float): Temperature setting for the model.
-            - tools (list): List of tools available for the agent.
-            - refresh_checkpointer (bool): Whether to refresh the checkpointer.
-            - agent (CompiledStateGraph): The agent instance.
     """
-    thread_id: str = str(uuid.uuid4())
-    host_persistence_config: dict[str, str | int] = {}
-    logger = get_logger(
-        name="memory_store",
-        loki_url=os.getenv("LOKI_URL")
-    )
     max_recursion_limit: int = 25
     summarize_node: SummarizationNode
-    model_name: str
-    model_provider: str
-    base_url: Optional[str] = None
-    temperature: float = 0.7
     tools: list = []
     agent: Optional[CompiledStateGraph] = None
-    refresh_checkpointer: bool = True
-    filter_minutes: int = 15
-    memory_agent_type: MemoryAgentType = "hotpath"
-    llm_api_key: SecretStr | None = None
 
     def __init__(self, **kwargs):
         """
         Initialize the MemoryAgent with the given parameters.
-        Args:
-            **kwargs: Arbitrary keyword arguments for configuration.
-                - thread_id (str): Unique identifier for the thread.
-                - host_persistence_config (dict): Configuration
-                    for host persistence.
-                - max_recursion_limit (int): Maximum recursion limit
-                    for the agent.
-                - filter_minutes (int): Minutes to filter old checkpoints.
-                - model_name (str): Name of the language model to use.
-                - model_provider (str): Provider of the language model.
-                - base_url (str, optional): Base URL for the model API.
-                - temperature (float): Temperature setting for the model.
-                - tools (list): List of tools available for the agent.
-                - refresh_checkpointer (bool): Whether to refresh
-                    the checkpointer.
-                - agent (CompiledStateGraph): The agent instance.
-                - llm_api_key (SecretStr | None): The API key for the
-                    language model.
         """
-        self.thread_id = kwargs.get("thread_id", self.thread_id)
-        msg = "Initializing MemoryAgent with thread_id: %s"
-        self.logger.info(msg, self.thread_id)
-
-        self.model_name = kwargs.get("model_name", "llama3.1")
-        self.model_provider = kwargs.get("model_provider", "ollama")
-        self.base_url = kwargs.get("base_url", None)
-
-        self.memory_agent_type = kwargs.get(
-            "memory_agent_type",
-            self.memory_agent_type
-        )
-        if self.memory_agent_type not in ("hotpath", "background"):
-            msg: str = (
-                f"Invalid memory_agent_type: {self.memory_agent_type}"
-                f" (must be one of: {['hotpath', 'background']})"
-            )
-            raise ValueError(msg)
-        else:
-            self.logger.info(
-                "Memory Type: %s",
-                self.memory_agent_type
-            )
-
-        self.host_persistence_config = kwargs.get(
-            "host_persistence_config",
-            self.host_persistence_config
-        )
-
-        if self.host_persistence_config == {}:
-            self.host_persistence_config = {
-                "host": os.getenv("REDIS_HOST", "localhost"),
-                "port": os.getenv("REDIS_PORT", 6379),
-                "db": os.getenv("REDIS_DB", 0),
-            }
-            msg = "Host persistence config initialized: %s"
-            self.logger.info(msg, self.host_persistence_config)
 
         self.max_recursion_limit = kwargs.get(
             "max_recursion_limit",
@@ -131,14 +35,10 @@ class MemoryAgent:
 
         self.summarize_node = SummarizationNode(
             token_counter=count_tokens_approximately,
-            model=self.model(),
+            model=self.llm_model,
             max_tokens=384,
             max_summary_tokens=128,
             output_messages_key="llm_input_messages",
-        )
-
-        self.filter_minutes = kwargs.get(
-            "filter_minutes", self.filter_minutes
         )
 
         self.agent = kwargs.get("agent", self.agent)
@@ -147,120 +47,10 @@ class MemoryAgent:
             self.refresh_checkpointer
         )
 
-        api_key: str | None = kwargs.get(
-            "llm_api_key",
-            None
-        )
-
-        self.llm_api_key = (
-            SecretStr(api_key)
-            if api_key is not None
-            else None
-        )
-
-    def _memory_manager(self):
-        """
-        Create a memory manager for the agent.
-        """
-        return create_memory_store_manager(
-            self.model(),
-            # Store memories in the "memories" namespace (aka directory)
-            namespace=("memories",),
-            store=self.store()
-        )
-
-    def _executor(self):
-        """
-        Create an executor for the agent.
-        """
-        return ReflectionExecutor(
-            self._memory_manager(),
-            store=self.store()
-        )
-
-    def _save_background_messages(
-        self,
-        config: RunnableConfig,
-        prompt: str,
-        response,
-        delay: int = 10
-    ):
-        """
-        Save background messages for later processing.
-        Args:
-            config (RunnableConfig): The configuration for the runnable.
-            prompt (str): The user prompt to save.
-            response: The response from the agent.
-            delay (int): Delay before processing the messages.
-        """
-        # build message list separately to keep line length within limits
-        # use HumanMessage so the list is List[BaseMessage]
-        messages = [{"role": "user", "content": prompt}, response]
-        to_process = {"messages": messages}
-        # depending on app context.
-        self._executor().submit(
-            to_process,
-            after_seconds=delay,
-            config=config
-        )
-
-    def _prompt(self, state):
-        """
-        Prepare the messages for the LLM.
-        Args:
-            state (dict): The current state of the agent.
-        Returns:
-            list: The prepared messages for the LLM.
-        """
-        # Get store from configured contextvar;
-        # Same as that provided to `create_react_agent`
-        store = get_store()
-        memories = store.search(
-            # Search within the same namespace as the one
-            # we've configured for the agent
-            ("memories",),
-            query=state["messages"][-1].content,
-        )
-        system_msg = f"""You are a helpful assistant.
-
-        ## Memories
-        <memories>
-        {memories}
-        </memories>
-        """
-        return [{"role": "system", "content": system_msg}, *state["messages"]]
-
-    @abstractmethod
-    def store(self) -> InMemoryStore:
-        """
-        Get the in-memory store for the agent.
-        Returns:
-            InMemoryStore: The in-memory store for the agent.
-        """
-        pass
-
-    def model(
-        self,
-        **kwargs
-    ) -> BaseChatModel:
-        """
-        Get the chat model for the agent.
-        Returns:
-            BaseChatModel: The chat model for the agent.
-        """
-        return init_chat_model(
-            self.model_name,
-            model_provider=self.model_provider,
-            temperature=self.temperature,
-            base_url=self.base_url,
-            api_key=self.llm_api_key,
-            **kwargs
-        )
-
     async def create_agent(
         self,
         checkpointer,
-        **kwargs_model
+        **kwargs
     ) -> CompiledStateGraph:
         """
         Create the agent's state graph.
@@ -270,13 +60,14 @@ class MemoryAgent:
             CompiledStateGraph: The compiled state graph for the agent.
         """
         return create_react_agent(
-            model=self.model(**kwargs_model),
+            model=self.llm_model,
             prompt=self._prompt,
             tools=await self._get_tools(),
             store=self.store(),
             state_schema=State,
             pre_model_hook=self.summarize_node,
-            checkpointer=checkpointer
+            checkpointer=checkpointer,
+            **kwargs
         )
 
     async def _get_tools(self):
@@ -287,17 +78,23 @@ class MemoryAgent:
         """
 
         self.tools.extend([
-            create_manage_memory_tool(namespace=("memories",))
+            create_manage_memory_tool(
+                namespace=self.namespace,
+                store=self.store()
+            ),
+            create_search_memory_tool(
+                namespace=self.namespace,
+                store=self.store()
+            )
         ])
-
-        if self.memory_agent_type == "background":
-            self.tools.extend([
-                create_search_memory_tool(namespace=("memories",))
-            ])
 
         return self.tools
 
-    def _params(self, prompt, thread_id):
+    def _params(
+        self,
+        prompt,
+        thread_id
+    ):
         """
         Prepares the configuration and input data for the agent
         based on the provided prompt and thread ID.
@@ -315,6 +112,12 @@ class MemoryAgent:
                 "recursion_limit": self.max_recursion_limit,
             }
         }
+
+        if self.user_id:
+            config["configurable"]["user_id"] = self.user_id
+
+        if self.session_id:
+            config["configurable"]["session_id"] = self.session_id
 
         input_data = {"messages": [{"role": "user", "content": prompt}]}
         return config, input_data
@@ -436,12 +239,10 @@ class MemoryAgent:
 
                     result["content"] = event_response
 
-                if self.memory_agent_type == "background":
-                    self._save_background_messages(
-                        config,
-                        prompt,
-                        response_agent
-                    )
+                await self.update_memory(
+                    event_messages,  # type: ignore
+                    config=config
+                )
 
                 return self._response(
                     thread_id=self.thread_id,
@@ -600,13 +401,6 @@ class MemoryAgent:
                                     result=result,
                                     error=None
                                 )
-
-                                if self.memory_agent_type == "background":
-                                    self._save_background_messages(
-                                        config,
-                                        prompt,
-                                        event_response
-                                    )
                     index += 1
 
         except Exception as e:
@@ -624,10 +418,3 @@ class MemoryAgent:
                 }
             )
             raise e
-
-    def chain(self, prompt: ChatPromptTemplate) -> RunnableSerializable:
-        """
-        Get the chain of prompts for the agent.
-        """
-        llm = self.model()
-        return prompt | llm
