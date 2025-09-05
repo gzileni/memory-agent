@@ -10,7 +10,6 @@ class AgentOllama(MemoryAgent):
     An agent for managing and utilizing memory with the Ollama model.
     """
     mem: MemoryOllama
-    key_search: str = "agent_ollama"
 
     def __init__(self, **kwargs):
         """
@@ -21,14 +20,16 @@ class AgentOllama(MemoryAgent):
             mem (MemoryOllama): The memory instance to use for the agent.
         """
         super().__init__(**kwargs)
-        self.key_search = kwargs.get("key_search", self.key_search)
         self.mem = MemoryOllama(
-            key_search=self.key_search,
             **kwargs
         )
-        self.model_name = kwargs.get("model_name", "llama3.1")
-        self.model_provider = "ollama"
-        self.base_url = kwargs.get("base_url", "https://localhost:11434")
+        self.llm_config = {
+            "model": "llama3.1",
+            "model_provider": "ollama",
+            "api_key": None,
+            "base_url": "http://localhost:11434",
+            "temperature": self.TEMPERATURE_DEFAULT,
+        }
         self.ollama_pull()
 
     def store(self) -> InMemoryStore:
@@ -45,8 +46,8 @@ class AgentOllama(MemoryAgent):
         Returns:
             dict: The response from the Ollama server.
         """
-        payload = {"name": self.model_name}
-        ollama_api = f"{self.base_url}/api/pull"
+        payload = {"name": self.llm_config["model"]}
+        ollama_api = f"{self.llm_config['base_url']}/api/pull"
         error: bool = False
         response: str = ""
 
@@ -57,7 +58,8 @@ class AgentOllama(MemoryAgent):
 
                     if data is None:
                         response = (
-                            f"Model {self.model_name} not found on Ollama "
+                            f"Model {self.llm_config['model']} "
+                            "not found on Ollama "
                             "server."
                         )
                         error = True
@@ -65,7 +67,7 @@ class AgentOllama(MemoryAgent):
 
                     if "error" in data:
                         response = (
-                            f"Error pulling model {self.model_name}: "
+                            f"Error pulling model {self.llm_config['model']}: "
                             f"{data['error']}"
                         )
                         error = True
@@ -74,7 +76,7 @@ class AgentOllama(MemoryAgent):
                     if "status" not in data:
                         response = (
                             "Unexpected response format for model "
-                            f"{self.model_name}: {data}"
+                            f"{self.llm_config['model']}: {data}"
                         )
                         error = True
                         break

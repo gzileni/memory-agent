@@ -72,7 +72,7 @@ services:
     container_name: memory-agent-loki
     profiles:
       - all
-      - dev
+      - log
     image: grafana/loki:latest
     ports:
       - "3100:3100"
@@ -84,7 +84,7 @@ services:
     container_name: memory-agent-promtail
     profiles:
       - all
-      - dev
+      - log
     image: grafana/promtail:latest
     volumes:
       - loki_log:/var/log
@@ -96,7 +96,7 @@ services:
     container_name: memory-agent-grafana
     profiles:
       - all
-      - dev
+      - log
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_AUTH_ANONYMOUS_ENABLED=true

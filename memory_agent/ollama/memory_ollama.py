@@ -5,6 +5,17 @@ from langgraph.store.base import IndexConfig
 
 
 class MemoryOllama(MemoryGraph):
+    """
+    Memory agent for Ollama embeddings.
+    Args:
+        **kwargs: Arbitrary keyword arguments for configuration.
+        model_embedding_name (str): The name of the model to use
+            for embeddings.
+        model_embedding_url (str): The base URL for the Ollama server.
+    Methods:
+        get_embedding_model: Initializes the embedding model.
+        memory_config: Returns the memory configuration.
+    """
 
     model_embedding: OllamaEmbeddings
     model_embedding_name: str | None = None
@@ -14,22 +25,27 @@ class MemoryOllama(MemoryGraph):
         """
         Initializes an instance of MemoryAgent with the provided parameters.
         Args:
+            **kwargs: Arbitrary keyword arguments for configuration.
             model_embedding_name (str): The name of the model to use
                 for embeddings.
-            model_embedding_url (str): The URL of the model to use
-                for embeddings.
+            model_embedding_url (str): The base URL for the Ollama server.
+        Raises:
+            ValueError: If the model_embedding_url is not set.
         """
         super().__init__(**kwargs)
 
-        self.model_embedding_name = kwargs.get(
-            "model_embedding_name",
-            "nomic-embed-text"
-        )
-        self.model_embedding_url = kwargs.get(
+        self.model_embedding_config["name"] = "nomic-embed-text"
+        self.model_embedding_config["url"] = kwargs.get(
             "model_embedding_url",
-            None
+            "http://localhost:11434"
         )
-        if self.model_embedding_url is None:
+
+        if self.model_embedding_config["name"] is None:
+            msg = "model_embedding_name not set"
+            self.logger.error(msg)
+            raise ValueError(msg)
+
+        if self.model_embedding_config["url"] is None:
             msg = (
                 (
                     "model_embedding_url not set, "
@@ -56,11 +72,9 @@ class MemoryOllama(MemoryGraph):
         try:
             self.logger.info("Using Ollama embeddings")
             # strip trailing slash and append path
-            base_url = str(self.model_embedding_url).rstrip("/")
-            self.model_embedding_url = f"{base_url}/api/embeddings"
             self.model_embedding = OllamaEmbeddings(
-                model=str(self.model_embedding_name),
-                base_url=self.model_embedding_url
+                model=str(self.model_embedding_config["name"]),
+                base_url=self.model_embedding_config["url"]
             )
         except Exception as e:
             msg = (
@@ -76,7 +90,8 @@ class MemoryOllama(MemoryGraph):
         Returns:
             IndexConfig: The memory configuration.
         """
+        collection_dim = self._get_collection_dim()
         return {
             "embed": self.model_embedding,
-            "dims": self.collection_dim,
+            "dims": collection_dim,
         }

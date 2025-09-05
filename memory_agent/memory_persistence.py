@@ -1,7 +1,7 @@
 import uuid
 from typing import Any, Literal
 from langchain_qdrant import QdrantVectorStore
-from qdrant_client.http.models import Distance, VectorParams
+from qdrant_client.http.models import Distance
 from langchain_core.documents import Document
 from qdrant_client import models, AsyncQdrantClient, QdrantClient
 from .memory import MemoryStore
@@ -9,6 +9,8 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from fastembed.common.model_description import PoolingType, ModelSource
 from fastembed import TextEmbedding
+from typing import Optional
+
 
 TypeEmbeddingModelVs = Literal["local", "hf"]
 
@@ -26,14 +28,25 @@ class MemoryPersistence(MemoryStore):
         persistent, searchable memory using Qdrant as the vector database.
     """
 
-    model_embedding_vs_path: str | None = None
-    model_embedding_vs_type: TypeEmbeddingModelVs = "hf"
-    model_embedding_vs_name: str = "BAAI/bge-large-en-v1.5"
+    COLLECTION_NAME_DEFAULT = "memory_agent"
+    COLLECTION_DIM_DEFAULT = 1536
     model_embedding_vs: TextEmbedding | None = None
-    collection_name: str
-    collection_dim: int = 1536
+    model_embedding_vs_config: dict[str, Any] = {
+        "path": None,
+        "type": "hf",
+        "name": "BAAI/bge-large-en-v1.5"
+    }
+    qdrant_config: dict[str, Any] = {
+        "url": "http://localhost:6333",
+    }
+    collection_config: dict[str, Any] = {
+        "collection_name": COLLECTION_NAME_DEFAULT,
+        "vectors_config": {
+            "size": COLLECTION_DIM_DEFAULT,
+            "distance": Distance.COSINE
+        }
+    }
     key_search: str | None = None
-    qdrant_url: str | None = None
     qdrant_client_async: AsyncQdrantClient
     qdrant_client: QdrantClient
 
@@ -50,25 +63,64 @@ class MemoryPersistence(MemoryStore):
         """
         super().__init__(**kwargs)
 
-        self.key_search = kwargs.get("key_search", "metadata.thread")
-        self.qdrant_url = kwargs.get("qdrant_url", None)
+        self.key_search = kwargs.get("key_search", "thread_agent")
+        self.qdrant_config = kwargs.get(
+            "qdrant_config",
+            self.qdrant_config
+        )
 
-        self.collection_name = kwargs.get("collection_name", "memory_store")
-        if self.collection_name is None:
-            raise ValueError("collection_name must be set")
-        self.collection_dim = kwargs.get("collection_dim", 1536)
+        if self.qdrant_config is None:
+            raise ValueError("qdrant_config must be set")
 
-        self.model_embedding_vs_type = kwargs.get(
-            "model_embedding_vs_type", "hf"
+        self.model_embedding_vs_config = kwargs.get(
+            "model_embedding_vs_config",
+            self.model_embedding_vs_config
         )
-        self.model_embedding_vs_path = kwargs.get(
-            "model_embedding_vs_path", None
+        if self.model_embedding_vs_config is None:
+            raise ValueError("model_embedding_vs_config must be set")
+
+        self._init_qdrant()
+
+    def _get_collection_name(self) -> str:
+        """
+        Get the collection name from the Qdrant configuration.
+
+        Returns:
+            str: The collection name.
+        Raises:
+            ValueError: If the collection name is not set in the
+                Qdrant configuration.
+        """
+        collection_name: str | None = self.collection_config.get(
+            "collection_name",
+            self.COLLECTION_NAME_DEFAULT
         )
-        self.model_embedding_vs_name = kwargs.get(
-            "model_embedding_vs_name", "BAAI/bge-large-en-v1.5"
+        if collection_name is None:
+            raise ValueError(
+                "collection_name must be set in collection_config"
+            )
+        return collection_name
+
+    def _get_collection_dim(self) -> int:
+        """
+        Get the collection dimension from the Qdrant configuration.
+        Returns:
+            int: The collection dimension.
+            Raises:
+            ValueError: If the vectors configuration or size
+                is not set in the Qdrant configuration.
+        """
+        vectors_config = self.collection_config.get(
+            "vectors_config",
+            None
         )
-        if self.qdrant_url is not None:
-            self.set_qdrant(self.qdrant_url)
+        if vectors_config is None:
+            raise ValueError("Vectors configuration must be provided")
+        collection_dim = vectors_config.get(
+            "size",
+            self.COLLECTION_DIM_DEFAULT
+        )
+        return collection_dim
 
     def get_embedding_model_vs(self) -> Any:
         """
@@ -84,11 +136,24 @@ class MemoryPersistence(MemoryStore):
         """
         try:
 
-            if self.model_embedding_vs_name is None:
+            model_name: str = self.model_embedding_vs_config.get(
+                "name",
+                "BAAI/bge-large-en-v1.5"
+            )
+            model_type: str = self.model_embedding_vs_config.get(
+                "type",
+                "hf"
+            )
+            model_path: str | None = self.model_embedding_vs_config.get(
+                "path",
+                None
+            )
+
+            if model_name is None:
                 raise ValueError("model_embedding_vs_name must be set")
 
-            if self.model_embedding_vs_type.lower() == 'local':
-                if self.model_embedding_vs_path is None:
+            if model_type.lower() == 'local':
+                if model_path is None:
                     msg = (
                         "model_embedding_path not set, "
                         "using default local model path"
@@ -96,16 +161,16 @@ class MemoryPersistence(MemoryStore):
                     self.logger.error(msg)
                     raise ValueError("model_embedding_path must be set")
                 TextEmbedding.add_custom_model(
-                    model=self.model_embedding_vs_name,
+                    model=model_name,
                     pooling=PoolingType.MEAN,
                     normalization=True,
-                    sources=ModelSource(hf=self.model_embedding_vs_name),
+                    sources=ModelSource(hf=model_name),
                     dim=384,
-                    model_file=self.model_embedding_vs_path,
+                    model_file=model_path,
                 )
-                return TextEmbedding(model=self.model_embedding_vs_name)
-            elif self.model_embedding_vs_type.lower() == 'hf':
-                return TextEmbedding(model=self.model_embedding_vs_name)
+                return TextEmbedding(model=model_name)
+            elif model_type.lower() == 'hf':
+                return TextEmbedding(model=model_name)
         except Exception as e:
             msg = (
                 f"Errore durante il caricamento del modello di embedding "
@@ -114,9 +179,8 @@ class MemoryPersistence(MemoryStore):
             self.logger.error(msg)
             raise e
 
-    def set_qdrant(
-        self,
-        qdrant_url: str
+    def _init_qdrant(
+        self
     ):
         """
         Set the Qdrant URL for the client.
@@ -124,19 +188,23 @@ class MemoryPersistence(MemoryStore):
         Args:
             qdrant_url (str): The URL of the Qdrant server.
         """
-        self.qdrant_url = qdrant_url
-        self.qdrant_client_async = AsyncQdrantClient(url=qdrant_url)
-        self.qdrant_client = QdrantClient(url=qdrant_url)
+        url = self.qdrant_config.get("url", None)
+        if url is None:
+            raise ValueError("qdrant_url must be set")
+        self.qdrant_client_async = AsyncQdrantClient(url=url)
+        self.qdrant_client = QdrantClient(url=url)
 
-        if not self.model_embedding_vs_name:
-            self.model_embedding_vs_name = "BAAI/bge-large-en-v1.5"
+        model_name: str = self.model_embedding_vs_config.get(
+            "name",
+            "BAAI/bge-large-en-v1.5"
+        )
 
-        self.qdrant_client_async.set_model(self.model_embedding_vs_name)
-        self.qdrant_client.set_model(self.model_embedding_vs_name)
+        self.qdrant_client_async.set_model(model_name)
+        self.qdrant_client.set_model(model_name)
 
     async def get_vector_store(
         self,
-        collection: str | None = None
+        collection: Optional[str] = None
     ) -> QdrantVectorStore:
         """
         Get or create a Qdrant vector store for the specified collection.
@@ -148,28 +216,20 @@ class MemoryPersistence(MemoryStore):
             QdrantVectorStore:
                 The Qdrant vector store for the specified collection.
         """
+        qdrant_url = self.qdrant_config.get("url", None)
+        if qdrant_url is None:
+            raise ValueError("qdrant_url must be set")
 
-        if self.qdrant_url is None:
-            raise ValueError(
-                "Qdrant URL is not set. Please provide a valid Qdrant URL."
-            )
-
-        collection_name = (
-            collection if collection else self.collection_name
-        )
+        collection_name = self._get_collection_name()
         collections_list = await self.qdrant_client_async.get_collections()
         existing_collections = [
             col.name for col in collections_list.collections
         ]
 
         # Check if the collection exists, if not, create it
-        if self.collection_name not in existing_collections:
+        if collection_name not in existing_collections:
             await self.qdrant_client_async.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(
-                    size=self.collection_dim,
-                    distance=Distance.COSINE
-                )
+                **self.collection_config
             )
             self.logger.info(
                 f"Collection '{collection_name}' created successfully!"
@@ -181,7 +241,7 @@ class MemoryPersistence(MemoryStore):
         return QdrantVectorStore.from_existing_collection(
             embedding=self.get_embedding_model_vs(),
             collection_name=collection_name,
-            url=self.qdrant_url
+            url=qdrant_url
         )
 
     def client_async(self) -> AsyncQdrantClient:

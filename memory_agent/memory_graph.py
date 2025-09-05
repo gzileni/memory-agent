@@ -44,19 +44,29 @@ class MemoryGraph(MemoryPersistence):
     and retrieve data.
     """
 
-    neo4j_url: str
-    neo4j_username: str
-    neo4j_password: str
-    neo4j_database: str | None = None
+    neo4j_auth: dict[str, Any] = {
+        "url": "neo4j://localhost:7687",
+        "username": "neo4j",
+        "password": "neo4j",
+        "database": None
+    }
+    neo4j_config: dict[str, Any] = {
+        "max_connection_lifetime": 1000,
+        "max_connection_pool_size": 50,
+        "connection_acquisition_timeout": 30,
+        "encrypted": False,
+        "trust": "TRUST_ALL_CERTIFICATES"
+    }
     neo4j_driver: Driver | None = None
-    aws_access_key_id: str | None
-    aws_secret_access_key: str | None
-    s3_bucket: str | None
-    aws_region: str | None
+    aws_config: dict[str, Any] | None = {
+        "access_key_id": None,
+        "secret_access_key": None,
+        "bucket": None,
+        "region": None
+    }
     path_download: str | None
     path_type: PathType = "fs"
     format_file: FormatFile = "pdf"
-    path_download: str | None = None
     fieldnames: list[str] = [
         "file_name",
         "updated_at",
@@ -64,110 +74,50 @@ class MemoryGraph(MemoryPersistence):
         "timestamp"
     ]
     memory_redis: MemoryRedisCacheRetriever
+    host_persistence_config: dict[str, Any] = {
+        "host": "localhost",
+        "port": 6379,
+        "db": 0,
+        "decode_responses": True
+    }
+    model_embedding_config: dict[str, Any] = {
+        "name": None,
+        "url": None
+    }
 
     def __init__(self, **kwargs):
         """
         Initialize the MemoryStoreGraph with the provided parameters.
-        Args:
-            neo4j_url (str): The URL of the Neo4j database.
-            neo4j_username (str): The username for the Neo4j database.
-            neo4j_password (str): The password for the Neo4j database.
-            neo4j_database (str, optional): The name of the Neo4j
-                database to use.
-            aws_access_key_id (str, optional): The AWS access key ID
-                for S3 access.
-            aws_secret_access_key (str, optional): The AWS secret access key
-                for S3 access.
-            s3_bucket (str, optional): The S3 bucket name for file storage.
-            aws_region (str, optional): The AWS region for S3 access.
-            path_download (str, optional): The local path for
-                downloading files.
-            redis_host (str, optional): The Redis host.
-            redis_port (int, optional): The Redis port.
-            redis_db (int, optional): The Redis database number.
+
         """
         super().__init__(**kwargs)
-        self.neo4j_url = kwargs.get("neo4j_url", os.getenv("NEO4J_URL"))
-        self.neo4j_username = kwargs.get(
-            "neo4j_username", os.getenv("NEO4J_USERNAME")
+        self.neo4j_config = kwargs.get(
+            "neo4j_config", self.neo4j_config
         )
-        self.neo4j_password = kwargs.get(
-            "neo4j_password", os.getenv("NEO4J_PASSWORD")
+        self.neo4j_auth = kwargs.get(
+            "neo4j_auth", self.neo4j_auth
         )
-        self.neo4j_database = kwargs.get("neo4j_database", None)
-
-        if not self.neo4j_url:
-            msg: str = (
-                "Neo4j URL not provided. Please set the 'neo4j_url' parameter "
-                "or the 'NEO4J_URL' environment variable."
-            )
-            self.logger.warning(msg)
-
-        if not self.neo4j_username:
-            msg: str = (
-                "Neo4j username not provided. "
-                " Please set the 'neo4j_username' parameter "
-                "or the 'NEO4J_USERNAME' environment variable."
-            )
-            self.logger.warning(msg)
-
-        if not self.neo4j_password:
-            msg: str = (
-                "Neo4j password not provided. "
-                "Please set the 'neo4j_password' parameter "
-                "or the 'NEO4J_PASSWORD' environment variable."
-            )
-            self.logger.warning(msg)
-
-        # Initialize Neo4j driver
-        if all([self.neo4j_url, self.neo4j_username, self.neo4j_password]):
-            self.neo4j_driver = GraphDatabase.driver(
-                self.neo4j_url,
-                auth=(self.neo4j_username, self.neo4j_password)
-            )
-
-            if self.neo4j_database:
-                self.logger.debug(
-                    f"Using Neo4j database: {self.neo4j_database}",
-                    extra=get_metadata(thread_id=str(self.thread_id))
-                )
-                self.create_database_if_not_exists(self.neo4j_database)
-
+        self.host_persistence_config = kwargs.get(
+            'host_persistence_config',
+            self.host_persistence_config
+        )
         self.format_file = kwargs.get('format_file', 'pdf')
         self.path_type = kwargs.get('path_type', 'fs')
+        self.aws_config = kwargs.get('aws_config', self.aws_config)
+        self.path_download = kwargs.get('path_download', None)
 
-        host = kwargs.get('redis_host', 'localhost')
-        port = kwargs.get('redis_port', 6379)
-        db = kwargs.get('redis_db', 0)
-
-        if not all([host, port, db]):
-            msg: str = (
-                "Redis connection parameters are not set. "
-                "Please provide valid host, port, and db."
-            )
-            self.logger.error(msg,
-                              extra=get_metadata(
-                                    thread_id=str(self.thread_id)
-                              ))
-            raise ValueError(msg)
-
-        self.memory_redis = MemoryRedisCacheRetriever(
-            host=host,
-            port=port,
-            db=db,
-            cache_key="memory_store_cache",
+        self.model_embedding_config = kwargs.get(
+            "model_embedding_config",
+            self.model_embedding_config
         )
 
         if self.path_type == "s3":
-            self.aws_access_key_id = kwargs.get('aws_access_key_id', None)
-            self.aws_secret_access_key = (
-                kwargs.get('aws_secret_access_key', None)
-            )
-            self.s3_bucket = kwargs.get('s3_bucket', None)
-            self.aws_region = kwargs.get('aws_region', None)
-            self.path_download = kwargs.get('path_download', None)
+            if self.aws_config is None:
+                raise ValueError(
+                    "AWS configuration is required for S3 path type."
+                )
 
-            if not self.path_download:
+            if self.path_download is None:
                 msg: str = (
                     "Path for downloading files from S3 is not set. "
                     "Please provide a valid path."
@@ -182,19 +132,63 @@ class MemoryGraph(MemoryPersistence):
 
             self._create_download_dir(self.path_download)
 
-            if not all([self.aws_access_key_id, self.aws_secret_access_key,
-                        self.s3_bucket, self.aws_region]):
-                msg: str = (
-                    "Missing AWS credentials or bucket information "
-                    "for S3 access. "
-                    "Please provide valid aws_access_key_id, "
-                    "aws_secret_access_key, s3_bucket, and aws_region."
+        self._init_neo4j()
+        self._init_redis()
+
+    def _init_redis(self):
+        """
+        Initialize the Redis connection with the provided parameters.
+        """
+        try:
+            if self.host_persistence_config is None:
+                self.host_persistence_config = {
+                    "host": "localhost",
+                    "port": 6379,
+                    "db": 0,
+                }
+
+            self.memory_redis = MemoryRedisCacheRetriever(
+                **self.host_persistence_config,
+                key_search=self.key_search
+            )
+        except Exception as e:
+            msg: str = f"Error connecting to Redis: {str(e)}"
+            self.logger.error(
+                msg,
+                extra=get_metadata(thread_id=str(self.thread_id))
+            )
+            raise ConnectionError(msg)
+
+    def _init_neo4j(self):
+        """
+        Initialize the Neo4j driver with the provided authentication details.
+        """
+        try:
+            if self.neo4j_auth is not None:
+                self.neo4j_driver = GraphDatabase.driver(
+                    self.neo4j_auth["url"],
+                    auth=(
+                        self.neo4j_auth["username"],
+                        self.neo4j_auth["password"]
+                    ),
+                    **self.neo4j_config
                 )
-                self.logger.error(
-                    msg,
-                    extra=get_metadata(thread_id=str(self.thread_id))
-                )
-                raise ValueError(msg)
+
+                if self.neo4j_auth['database'] is not None:
+                    self.logger.debug(
+                        f"Using Neo4j database: {self.neo4j_auth['database']}",
+                        extra=get_metadata(thread_id=str(self.thread_id))
+                    )
+                    self.create_database_if_not_exists(
+                        self.neo4j_auth['database']
+                    )
+        except Exception as e:
+            msg: str = f"Error connecting to Neo4j: {str(e)}"
+            self.logger.error(
+                msg,
+                extra=get_metadata(thread_id=str(self.thread_id))
+            )
+            raise ConnectionError(msg)
 
     @abstractmethod
     def chain(self, prompt: ChatPromptTemplate) -> RunnableSerializable:
@@ -745,6 +739,7 @@ class MemoryGraph(MemoryPersistence):
             NotImplementedError: If the method is not implemented.
         """
         try:
+            collection_name = self._get_collection_name()
             yield "Analyzing raw data for graph components."
             nodes, relationships = await self.extract_graph_components(
                 raw_data
@@ -769,8 +764,7 @@ class MemoryGraph(MemoryPersistence):
             )
             yield "Vectorized raw data and ingested data"
             self.logger.debug(
-                f"Ingested data into Qdrant collection "
-                f"'{self.collection_name}'."
+                f"Ingested data into Qdrant collection {collection_name}."
             )
         except Exception as e:
             self.logger.error(
@@ -1181,6 +1175,8 @@ class MemoryGraph(MemoryPersistence):
         extra: dict = get_metadata(thread_id=str(self.thread_id))
         force: bool = kwargs.get("force", False)
 
+        collection_name = self._get_collection_name()
+
         if len(documents) == 0:
             path = kwargs.get("path", None)
             if path is None:
@@ -1252,7 +1248,7 @@ class MemoryGraph(MemoryPersistence):
         # Call the ingestion method from the parent class
         async for d in self._ingestion_batch(
             documents=docs,
-            collection_name=self.collection_name,
+            collection_name=collection_name,
             thread=self.thread_id
         ):
             yield d
@@ -1282,12 +1278,47 @@ class MemoryGraph(MemoryPersistence):
         path_download = kwargs.get("path_download", None)
         refresh = kwargs.get("refresh", False)
 
+        if self.aws_config is None:
+            msg: str = (
+                "AWS configuration is not set. "
+                "Please provide valid AWS configuration."
+            )
+            # Log the error message and raise a ValueError
+            # to indicate that the AWS configuration is not set.
+            # This will help in debugging and ensure that the user is
+            # aware of the issue.
+            # Raise a ValueError to indicate that the AWS configuration
+            # is not set.
+            # Log the error message
+            self.logger.error(
+                msg,
+                extra=get_metadata(thread_id=str(self.thread_id))
+            )
+            raise ValueError(msg)
+
+        aws_access_key_id = self.aws_config.get(
+            "access_key_id",
+            None
+        )
+        aws_secret_access_key = self.aws_config.get(
+            "secret_access_key",
+            None
+        )
+        s3_bucket = self.aws_config.get(
+            "bucket",
+            None
+        )
+        aws_region = self.aws_config.get(
+            "region",
+            None
+        )
+
         self.logger.info("Processing documents from S3.")
         if not all([
-            self.aws_access_key_id,
-            self.aws_secret_access_key,
-            self.s3_bucket,
-            self.aws_region
+            aws_access_key_id,
+            aws_secret_access_key,
+            s3_bucket,
+            aws_region
         ]):
             msg: str = (
                 "Missing AWS credentials or bucket information for S3 access. "
@@ -1341,10 +1372,10 @@ class MemoryGraph(MemoryPersistence):
             raise ValueError(msg)
 
         s3_client = S3Client(
-            aws_access_key_id=self.aws_access_key_id,
-            aws_secret_access_key=self.aws_secret_access_key,
-            bucket_name=self.s3_bucket,
-            region_name=self.aws_region
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            bucket_name=s3_bucket,
+            region_name=aws_region
         )
         list_files: list[str] = s3_client.list_files(prefix)
         list_files.sort()
@@ -1391,8 +1422,8 @@ class MemoryGraph(MemoryPersistence):
 
             async for d in self.process_documents(
                 path=local_file,
-                bucket_name=self.s3_bucket,
-                aws_region=self.aws_region
+                bucket_name=s3_bucket,
+                aws_region=aws_region
             ):
                 if d == "ERROR":
                     await self._update_cache(file_name=file, error=True)
@@ -1648,6 +1679,10 @@ class MemoryGraph(MemoryPersistence):
         Refreshes the graph by deleting all relationships and collections,
         then recreating the collection.
         """
+
+        collection_name = self._get_collection_name()
+        collection_dim = self._get_collection_dim()
+
         self.logger.debug(
             "Deleting cache",
             extra=get_metadata(thread_id=str(self.thread_id))
@@ -1661,17 +1696,17 @@ class MemoryGraph(MemoryPersistence):
         self.delete_all_relationships()
         # Delete all collections in the graph
         self.logger.info(
-            f"Deleting collection {self.collection_name} in the graph.",
+            f"Deleting collection {collection_name} in the graph.",
             extra=get_metadata(thread_id=str(self.thread_id))
         )
-        await self.delete_collection_async(self.collection_name)
+        await self.delete_collection_async(collection_name)
         self.logger.info(
-            f"Creating new collection {self.collection_name} in the graph.",
+            f"Creating new collection {collection_name} in the graph.",
             extra=get_metadata(thread_id=str(self.thread_id))
         )
         await self.create_collection_async(
-            self.collection_name,
-            self.collection_dim
+            collection_name,
+            collection_dim
         )
         self.logger.info(
             "Graph refreshed successfully.",
@@ -1713,15 +1748,15 @@ class MemoryGraph(MemoryPersistence):
                 or if the raw data is empty.
         """
         try:
-            if not self.collection_name:
-                raise ValueError("Collection name must be provided")
+            collection_name = self._get_collection_name()
+            collection_dim = self._get_collection_dim()
 
             if await self.create_collection_async(
-                self.collection_name,
-                self.collection_dim
+                collection_name,
+                collection_dim
             ):
                 self.logger.debug(
-                    f"Collection '{self.collection_name}' created successfully"
+                    f"Collection '{collection_name}' created successfully"
                 )
 
             e = self.embeddings(raw_data)
@@ -1747,7 +1782,7 @@ class MemoryGraph(MemoryPersistence):
                         point.payload = metadata
 
             await self.qdrant_client_async.upsert(
-                collection_name=self.collection_name,
+                collection_name=collection_name,
                 points=points
             )
         except Exception as e:
@@ -1772,10 +1807,13 @@ class MemoryGraph(MemoryPersistence):
                 is not initialized.
         """
         try:
+
+            collection_name = self._get_collection_name()
+
             retriever = QdrantNeo4jRetriever(
                 driver=neo4j_driver,
                 client=self.qdrant_client,
-                collection_name=self.collection_name,
+                collection_name=collection_name,
                 id_property_external="id",
                 id_property_neo4j="id",
             )

@@ -4,7 +4,7 @@ from langmem import (
     create_memory_store_manager,
     ReflectionExecutor
 )
-from memory_schemas import Episode, UserProfile, Triple
+from .memory_schemas import Episode, UserProfile, Triple
 from typing import Literal
 from .memory_log import get_logger
 from abc import abstractmethod
@@ -22,8 +22,67 @@ MemoryActionType = Literal["hotpath", "background"]
 class MemoryManager:
     """
     A manager for handling memory operations within the MemoryAgent.
+    Args:
+        thread_id (str): The ID of the thread.
+        user_id (str): The ID of the user.
+            Default:
+                "*"
+        session_id (str): The ID of the session.
+            Default:
+                "*"
+        action_type (MemoryActionType): The type of action to perform.
+            Default:
+                "hotpath"
+            Values:
+                "hotpath"
+                "background"
+        store_type (MemoryStoreType): The type of memory store to use.
+            Default:
+                "semantic"
+            Values:
+                "episodic"
+                "user"
+                "semantic"
+        filter_minutes (int): The number of minutes to filter memories.
+            Default:
+                60
+        host_persistence_config (dict[str, Any]): The configuration
+            for host persistence.
+            Default:
+                {
+                    "host": "localhost",
+                    "port": 6379,
+                    "db": 0
+                }
+        llm_config (dict[str, Any]): The configuration for the LLM.
+            Default:
+                {
+                    "model": "llama3.1",
+                    "model_provider": "ollama",
+                    "api_key": None,
+                    "base_url": "http://localhost:11434",
+                    "temperature": 0.7,
+                }
+    Methods:
+        store(): Get the in-memory store for the agent.
+        update_memory(): Update memory with new conversation data.
+    Attributes:
+        namespace (tuple): The namespace for the memory store.
+        thread_id (str): The ID of the thread.
+        user_id (str): The ID of the user.
+        session_id (str): The ID of the session.
+        logger: The logger for the memory manager.
+        refresh_checkpointer (bool): Whether to refresh the checkpointer.
+        filter_minutes (int): The number of minutes to filter memories.
+        action_type (MemoryActionType): The type of action to perform.
+        store_type (MemoryStoreType): The type of memory store to use.
+        llm_config (dict[str, Any]): The configuration for the LLM.
+        llm_model: The chat model for the agent.
+        host_persistence_config (dict[str, Any]): The configuration
+            for host persistence.
     """
 
+    TEMPERATURE_DEFAULT = 0.7
     namespace: tuple
     thread_id: str = str(uuid.uuid4())
     user_id: str = "*"
@@ -38,11 +97,11 @@ class MemoryManager:
     store_type: MemoryStoreType = "semantic"
 
     llm_config: dict[str, Any] = {
-        "model": "llama3.1",
-        "model_provider": "ollama",
+        "model": None,
+        "model_provider": None,
         "api_key": None,
-        "base_url": "http://localhost:11434",
-        "temperature": 0.7,
+        "base_url": None,
+        "temperature": None,
     }
 
     llm_model: BaseChatModel
@@ -50,6 +109,7 @@ class MemoryManager:
         "host": "localhost",
         "port": 6379,
         "db": 0,
+        "decode_responses": True
     }
 
     def __init__(self, **kwargs):
@@ -106,22 +166,7 @@ class MemoryManager:
             "host_persistence_config",
             self.host_persistence_config
         )
-
-        self.host_persistence_config = {
-            "host": os.getenv(
-                "REDIS_HOST",
-                self.host_persistence_config.get("host", "localhost"),
-            ),
-            "port": os.getenv(
-                "REDIS_PORT",
-                self.host_persistence_config.get("port", 6379),
-            ),
-            "db": os.getenv(
-                "REDIS_DB",
-                self.host_persistence_config.get("db", 0),
-            ),
-        }
-        msg = "Host persistence config initialized: %s"
+        msg = "Redis config initialized: %s"
         self.logger.info(msg, self.host_persistence_config)
 
         msg = (

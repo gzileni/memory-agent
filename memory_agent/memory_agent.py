@@ -17,16 +17,44 @@ from .state import State
 class MemoryAgent(MemoryManager):
     """
     A memory agent for managing and utilizing memory in AI applications.
+    Args:
+        max_recursion_limit (int): Maximum recursion depth for the agent.
+        summarize_node (SummarizationNode): Node for summarizing conversations.
+        tools (list): A list of tools available for the agent.
+        agent (CompiledStateGraph | None): Predefined agent state graph.
+        max_tokens (int): Maximum tokens for the agent's input.
+        max_summary_tokens (int): Maximum tokens for summarization.
+    Methods:
+        create_agent(checkpointer, **kwargs): Create the agent's state graph.
+        ainvoke(prompt, thread_id=None, **kwargs_model): Asynchronously run
+            the agent.
+        stream(prompt, thread_id=None, **kwargs_model): Asynchronously stream
+            response chunks.
     """
     max_recursion_limit: int = 25
     summarize_node: SummarizationNode
     tools: list = []
     agent: Optional[CompiledStateGraph] = None
+    max_tokens: int = 384
+    max_summary_tokens: int = 128
 
     def __init__(self, **kwargs):
         """
         Initialize the MemoryAgent with the given parameters.
+        Args:
+            max_tokens (int): Maximum tokens for the agent's input.
+            max_summary_tokens (int): Maximum tokens for summarization.
+            max_recursion_limit (int): Maximum recursion depth for the agent.
+            agent (CompiledStateGraph | None): Predefined agent state graph.
+            refresh_checkpointer (bool): Whether to refresh the checkpointer.
+            **kwargs: Arbitrary keyword arguments for configuration.
         """
+        super().__init__(**kwargs)
+        self.max_tokens = kwargs.get("max_tokens", self.max_tokens)
+        self.max_summary_tokens = kwargs.get(
+            "max_summary_tokens",
+            self.max_summary_tokens
+        )
 
         self.max_recursion_limit = kwargs.get(
             "max_recursion_limit",
@@ -56,6 +84,7 @@ class MemoryAgent(MemoryManager):
         Create the agent's state graph.
         Args:
             checkpointer: The checkpointer instance to use for managing state.
+            **kwargs: Arbitrary keyword arguments for configuration.
         Returns:
             CompiledStateGraph: The compiled state graph for the agent.
         """
@@ -217,8 +246,7 @@ class MemoryAgent(MemoryManager):
 
                 response_agent = await self.agent.ainvoke(
                     input=input_data,
-                    config=config,
-                    stream_mode="updates"
+                    config=config
                 )
 
                 if (
@@ -239,10 +267,10 @@ class MemoryAgent(MemoryManager):
 
                     result["content"] = event_response
 
-                await self.update_memory(
-                    event_messages,  # type: ignore
-                    config=config
-                )
+                    await self.update_memory(
+                        event_response,
+                        config=config
+                    )
 
                 return self._response(
                     thread_id=self.thread_id,
@@ -260,7 +288,7 @@ class MemoryAgent(MemoryManager):
                 error={"message": str(e)}
             )
 
-    async def stream(
+    async def astream(
         self,
         prompt: str,
         thread_id: Optional[str] = None,
@@ -395,6 +423,11 @@ class MemoryAgent(MemoryManager):
                                     'require_user_input': False,
                                     'content': event_response,
                                 }
+
+                                await self.update_memory(
+                                    event_response,
+                                    config=config
+                                )
 
                                 yield self._response(
                                     thread_id=self.thread_id,

@@ -13,12 +13,15 @@ class MemoryRedisCacheRetriever:
     """
 
     redis_conn: Redis
-    cache_key: str = "filemeta"
-    host: str = "localhost"
-    port: int = 6379
-    db: int = 10
+    key_search: str = "filemeta"
     logger = get_logger(name="MemoryRedisCacheRetriever",
                         loki_url=os.getenv("LOKI_URL"))
+    host_persistence_config: dict[str, Any] = {
+        "host": "localhost",
+        "port": 6379,
+        "db": 0,
+        "decode_responses": True
+    }
 
     def __init__(self, **kwargs):
         """
@@ -26,19 +29,15 @@ class MemoryRedisCacheRetriever:
         Redis connection parameters.
         Args:
             **kwargs: Additional parameters for Redis connection, such as:
-                - host (str): Redis server host.
-                - port (int): Redis server port.
-                - db (int): Redis database number.
-                - cache_key (str): Key prefix for caching.
+                - key_search (str): Key prefix for caching.
+                - host_persistence_config (dict): Redis connection config.
         """
-        self.host = kwargs.get("host", self.host)
-        self.port = kwargs.get("port", self.port)
-        self.db = kwargs.get("db", self.db)
-        self.cache_key = kwargs.get("cache_key", self.cache_key)
-        self.redis_conn = Redis(host=self.host,
-                                port=self.port,
-                                db=self.db,
-                                decode_responses=True)
+        self.host_persistence_config = kwargs.get(
+            "host_persistence_config",
+            self.host_persistence_config
+        )
+        self.key_search = kwargs.get("key_search", self.key_search)
+        self.redis_conn = Redis(**self.host_persistence_config)
 
     def add_cache(self, data: dict[str, Any] = {}):
         """
@@ -49,7 +48,7 @@ class MemoryRedisCacheRetriever:
                 Expected keys are 'file_name', 'ingested', and 'ts'.
         """
         update_at = datetime.now(timezone.utc).isoformat()
-        key = f"{self.cache_key}${data.get('file_name', '')}"
+        key = f"{self.key_search}${data.get('file_name', '')}"
         file_name = data.get("file_name", None)
         if not file_name:
             raise ValueError("file_name is required in data")
@@ -70,7 +69,7 @@ class MemoryRedisCacheRetriever:
             list[dict[str, Any]]: A list of dictionaries
                 containing file metadata.
         """
-        pattern = f"{self.cache_key}$*"
+        pattern = f"{self.key_search}$*"
         keys = await self.redis_conn.keys(pattern)
 
         rows: list[dict[str, Any]] = []
@@ -94,7 +93,7 @@ class MemoryRedisCacheRetriever:
             Optional[dict[str, Any]]: The metadata dictionary
                 if found, else None.
         """
-        data = self.redis_conn.hgetall(f"{self.cache_key}${file_name}")
+        data = self.redis_conn.hgetall(f"{self.key_search}${file_name}")
 
         if inspect.isawaitable(data):
             data = await data
@@ -119,7 +118,7 @@ class MemoryRedisCacheRetriever:
         Returns:
             bool: True if the record was deleted, False otherwise.
         """
-        key = f"{self.cache_key}${file_name}"
+        key = f"{self.key_search}${file_name}"
         result = await self.redis_conn.delete(key)  # type: ignore
         return result > 0
 
@@ -131,7 +130,7 @@ class MemoryRedisCacheRetriever:
             bool: True if the cache was cleared, False otherwise.
         """
         try:
-            pattern = f"{self.cache_key}$*"
+            pattern = f"{self.key_search}$*"
             keys = self.redis_conn.keys(pattern)
 
             if inspect.isawaitable(keys):
@@ -161,7 +160,7 @@ class MemoryRedisCacheRetriever:
         Returns:
             bool: True if the record was updated, False otherwise.
         """
-        key = f"{self.cache_key}${file_name}"
+        key = f"{self.key_search}${file_name}"
         # Optionally update the update_at timestamp
         updates["update_at"] = datetime.now(timezone.utc).isoformat()
         result = self.redis_conn.hset(key, mapping=updates)

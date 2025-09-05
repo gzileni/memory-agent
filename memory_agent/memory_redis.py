@@ -15,7 +15,9 @@ from langgraph.checkpoint.serde.base import SerializerProtocol
 REDIS_KEY_SEPARATOR = "$"
 
 
-def _parse_configurable(config: RunnableConfig) -> tuple[str, str, str | None]:
+def _parse_configurable(
+    config: RunnableConfig
+) -> tuple[str, str, str | None]:
     """
     Extract the configurable part of a RunnableConfig.
 
@@ -41,7 +43,9 @@ def _parse_configurable(config: RunnableConfig) -> tuple[str, str, str | None]:
 
 
 def _make_redis_checkpoint_key(
-    thread_id: str, checkpoint_ns: str, checkpoint_id: str
+    thread_id: str,
+    checkpoint_ns: str,
+    checkpoint_id: str
 ) -> str:
     """
     Generate a Redis key for a checkpoint.

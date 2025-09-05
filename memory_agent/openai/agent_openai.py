@@ -1,3 +1,4 @@
+import os
 from memory_agent.memory_agent import MemoryAgent
 from memory_agent.openai import MemoryOpenAI
 from langgraph.store.memory import InMemoryStore
@@ -12,25 +13,21 @@ class AgentOpenAI(MemoryAgent):
         mem (MemoryOpenAI): The memory instance to use for the agent.
     """
     mem: MemoryOpenAI
-    key_search: str = "agent_openai"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        if self.llm_api_key is None:
-            raise ValueError("LLM_API_KEY must be set")
-
-        self.key_search = kwargs.get(
-            "key_search",
-            self.key_search
-        )
         self.mem = MemoryOpenAI(
-            key_search=self.key_search,
             **kwargs
         )
-        self.model_name = kwargs.get("model_name", "gpt-4.1-mini")
-        self.model_provider = "openai"
-        self.base_url = kwargs.get("base_url", None)
+
+        self.llm_config = {
+            "model": "gpt-4.1-mini",
+            "model_provider": "openai",
+            "api_key": os.getenv("OPENAI_API_KEY"),
+            "base_url": None,
+            "temperature": self.TEMPERATURE_DEFAULT,
+        }
 
     def store(self) -> InMemoryStore:
         return self.mem.in_memory_store()
