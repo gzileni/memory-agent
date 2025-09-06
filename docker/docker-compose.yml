@@ -7,8 +7,7 @@ services:
       - cpu
       - dev
     restart: always
-    # image: ghcr.io/gzileni/memory-agent:cpu
-    image: memory-agent:latest
+    image: ghcr.io/gzileni/memory-agent:cpu
     pull_policy: never
     ports:
       - "8000:8000"
