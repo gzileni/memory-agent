@@ -22,7 +22,7 @@ from langgraph.checkpoint.base import (
     PendingWrite,
 )
 from redis.asyncio import Redis as AsyncRedis
-from ..memory_log import get_metadata, get_logger
+from .memory_log import get_metadata, get_logger
 from .memory_redis import (_make_redis_checkpoint_key,
                            _make_redis_checkpoint_writes_key,
                            _parse_redis_checkpoint_key,
@@ -92,19 +92,22 @@ class MemoryCheckpointer(BaseCheckpointSaver):
         loki_url=os.getenv("LOKI_URL"),
     )
 
-    def __init__(self, conn: AsyncRedis):
+    def __init__(self, **kwargs):
         super().__init__()
-        self.conn = conn
+        self.conn = AsyncRedis(
+            **kwargs
+        )
 
     @classmethod
     @asynccontextmanager
     async def from_conn_info(
-        cls, *, host: str, port: int, db: int
+        cls,
+        **kwargs
     ) -> AsyncIterator["MemoryCheckpointer"]:
         conn = None
         try:
-            conn = AsyncRedis(host=host, port=port, db=db)
-            yield MemoryCheckpointer(conn)
+            conn = AsyncRedis(**kwargs)
+            yield MemoryCheckpointer(conn=conn)
         finally:
             if conn:
                 await conn.aclose()
@@ -236,7 +239,10 @@ class MemoryCheckpointer(BaseCheckpointSaver):
         thread_id, checkpoint_ns, checkpoint_id = _parse_configurable(config)
 
         checkpoint_key = await self._aget_checkpoint_key(
-            self.conn, thread_id, checkpoint_ns, checkpoint_id
+            self.conn,
+            thread_id,
+            checkpoint_ns,
+            checkpoint_id
         )
         if not checkpoint_key:
             return None

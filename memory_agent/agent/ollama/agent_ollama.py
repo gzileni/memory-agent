@@ -92,6 +92,9 @@ class AgentOllama(MemoryAgent):
 
         return error, response
 
+    def embed_query(self, text: str) -> list[float]:
+        return self.mem.model_embedding.embed_query(text)
+
     def index_store(self) -> Any:
         return {
             "embed": self.mem.model_embedding,

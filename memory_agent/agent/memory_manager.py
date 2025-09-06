@@ -1,20 +1,21 @@
 import uuid
 import os
 from langmem import (
-    create_memory_store_manager,
-    ReflectionExecutor
+    create_memory_store_manager
 )
 from .memory_schemas import Episode, UserProfile, Triple
 from typing import Literal
-from memory_agent import get_logger
+from memory_agent import (
+    get_logger
+)
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models.chat_models import BaseChatModel
-from langgraph.config import get_store
 from typing import Any
 from langchain_core.runnables import RunnableConfig
+from abc import abstractmethod
+from langgraph.store.base import BaseStore
 
 MemoryStoreType = Literal["episodic", "user", "semantic"]
-MemoryActionType = Literal["hotpath", "background"]
 
 
 class MemoryManager:
@@ -91,7 +92,6 @@ class MemoryManager:
     )
     refresh_checkpointer: bool = True
     filter_minutes: int = 60
-    action_type: MemoryActionType = "hotpath"
     store_type: MemoryStoreType = "semantic"
 
     llm_config: dict[str, Any] = {
@@ -109,7 +109,7 @@ class MemoryManager:
         "db": 0,
         "decode_responses": True
     }
-    vector_store: Any
+    vector_store: BaseStore
 
     def __init__(self, **kwargs):
         """
@@ -155,7 +155,6 @@ class MemoryManager:
         self.thread_id = kwargs.get("thread_id", self.thread_id)
         self.user_id = kwargs.get("user_id", self.user_id)
         self.session_id = kwargs.get("session_id", self.session_id)
-        self.action_type = kwargs.get("action_type", self.action_type)
         self.store_type = kwargs.get("store_type", self.store_type)
         self.filter_minutes = kwargs.get("filter_minutes", self.filter_minutes)
         self.llm_config = kwargs.get("llm_config", self.llm_config)
@@ -186,6 +185,34 @@ class MemoryManager:
             self.session_id,
         )
 
+    @abstractmethod
+    def index_store(self) -> Any:
+        """
+        Get the index store configuration.
+        Returns:
+            Any: The index store configuration.
+        """
+        pass
+
+    @abstractmethod
+    def embed_query(self, text: str) -> list[float]:
+        """
+        Embed a query text into a vector.
+        Args:
+            text (str): The text to embed.
+        Returns:
+            list[float]: The embedded vector.
+        """
+        pass
+
+    def _convert_namespace(self) -> str:
+        """
+        Convert the namespace tuple to a string.
+        Returns:
+            str: The converted namespace string.
+        """
+        return ":".join(self.namespace)
+
     def _redis_uri_store(self) -> str:
         """
         Create a Redis URI from the host persistence configuration.
@@ -194,8 +221,8 @@ class MemoryManager:
         """
         host = self.host_persistence_config["host"]
         port = self.host_persistence_config["port"]
-        db = self.host_persistence_config["db"]
-        return f"redis://{host}:{port}/{db}"
+        # db = self.host_persistence_config["db"]
+        return f"redis://{host}:{port}"
 
     def _prompt(self, state):
         """
@@ -207,6 +234,7 @@ class MemoryManager:
         """
         # Get store from configured contextvar;
         # Same as that provided to `create_react_agent`
+
         memories = self._get_similar(state)
         system_message = "You are a helpful assistant."
 
@@ -214,14 +242,15 @@ class MemoryManager:
             if self.store_type == "episodic":
                 system_message += "\n\n### EPISODIC MEMORY:"
                 for i, item in enumerate(memories, start=1):
-                    episode = item.value["content"]
-                    system_message += f"""
-                    Episode {i}:
-                    When: {episode['observation']}
-                    Thought: {episode['thoughts']}
-                    Did: {episode['action']}
-                    Result: {episode['result']}
-                    """
+                    if item is not None:
+                        episode = item.value["content"]
+                        system_message += f"""
+                        Episode {i}:
+                        When: {episode['observation']}
+                        Thought: {episode['thoughts']}
+                        Did: {episode['action']}
+                        Result: {episode['result']}
+                        """
             elif self.store_type == "user":
                 system_message += f"""<User Profile>:
                 {memories[0].value}
@@ -238,7 +267,7 @@ class MemoryManager:
 
         return [
             {"role": "system", "content": system_message},
-            *state["messages"],
+            *state["messages"]
         ]
 
     def create_memory(
@@ -247,6 +276,7 @@ class MemoryManager:
         instructions: str,
         schemas: list,
         namespace: tuple,
+        store: Any,
         **kwargs
     ):
         """
@@ -262,7 +292,7 @@ class MemoryManager:
             schemas=schemas,
             instructions=instructions,
             namespace=namespace,
-            store=self.vector_store,
+            store=store,
             **kwargs,
         )
 
@@ -278,13 +308,12 @@ class MemoryManager:
             namespace: The namespace to use for the search.
         """
         try:
-            store = get_store()
-            query = state["messages"][-1].content
-            similar = store.search(
-                # Search within the same namespace as the one
-                # we've configured for the agent
+            query: str = state["messages"][-1].content
+            if self.vector_store is None:
+                raise ValueError("Vector store is not initialized.")
+            similar = self.vector_store.search(
                 self.namespace,
-                query=query,
+                query=query
             )
             return similar
         except Exception as e:
@@ -304,11 +333,10 @@ class MemoryManager:
         """
         return init_chat_model(**model_config)
 
-    async def update_memory(
+    def update_memory(
         self,
         messages,
         config: RunnableConfig,
-        delay: int = 10,
         **kwargs
     ):
         """
@@ -324,55 +352,48 @@ class MemoryManager:
         """
 
         # validate store_type against allowed values
-        allowed_store_types = ("episodic", "user", "semantic")
-        if self.store_type not in allowed_store_types:
-            raise ValueError(
-                f"store_type must be one of {allowed_store_types}"
+        try:
+            allowed_store_types = ("episodic", "user", "semantic")
+            if self.store_type not in allowed_store_types:
+                raise ValueError(
+                    f"store_type must be one of {allowed_store_types}"
+                )
+
+            # Determine namespace based on store_type
+            if self.store_type == "episodic":
+                instructions = (
+                    "Extract examples of successful explanations, "
+                    "capturing the full chain of reasoning. "
+                    "Be concise in your explanations and precise in the "
+                    "logic of your reasoning."
+                )
+                schemas = [Episode]
+            elif self.store_type == "user":
+                instructions = (
+                    "Extract user profile information"
+                )
+                schemas = [UserProfile]
+            else:  # semantic
+                instructions = (
+                    "Extract user preferences and any other useful information"
+                )
+                schemas = [Triple]
+
+            mem = self.create_memory(
+                self.llm_model,
+                instructions=instructions,
+                schemas=schemas,
+                namespace=self.namespace,
+                store=self.vector_store,
+                **kwargs
             )
 
-        # Determine namespace based on store_type
-        if self.store_type == "episodic":
-            instructions = (
-                "Extract examples of successful explanations, "
-                "capturing the full chain of reasoning. "
-                "Be concise in your explanations and precise in the "
-                "logic of your reasoning."
-            )
-            schemas = [Episode]
-        elif self.store_type == "user":
-            instructions = (
-                "Extract user profile information"
-            )
-            schemas = [UserProfile]
-        else:  # semantic
-            instructions = (
-                "Extract user preferences and any other useful information"
-            )
-            schemas = [Triple]
+            input: Any = {"messages": messages}
 
-        mem = self.create_memory(
-            self.llm_model,
-            instructions=instructions,
-            schemas=schemas,
-            namespace=self.namespace,
-            **kwargs
-        )
-
-        input = {"messages": messages}
-
-        if self.action_type == "background":
-            executor = ReflectionExecutor(
-                mem,
-                store=self.vector_store
-            )
-
-            return executor.submit(
+            return mem.invoke(
                 input,
-                after_seconds=delay,
                 config=config
             )
-        else:
-            return await mem.ainvoke(
-                input,  # type: ignore
-                config=config
-            )
+        except Exception as e:
+            self.logger.error("Error updating memory: %s", e)
+            raise e

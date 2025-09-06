@@ -65,28 +65,13 @@ agent = AgentOllama(
 
 
 async def run_agent(msg: str):
-    response = await agent.ainvoke(msg)
-    if response.get("error") is not None:
-        err = response.get("error")
-        if err is not None:
-            print("Error: ", err.get("message"))
-            return
-    result = response.get("result")
-    if result is not None:
-        print(result.get("content"))
+    response = agent.invoke(msg)
+    print(response)
 
 
 async def run_agent_stream(msg: str):
     async for token in agent.astream(msg):
-        if token.get("error") is not None:
-            err = token.get("error")
-            if err is not None:
-                print("Error: ", err.get("message"))
-                return
-        print("---> ", end="", flush=True)
-        result = token.get("result")
-        if result is not None:
-            print(result.get("content"))
+        print(token)
 
 
 async def main():

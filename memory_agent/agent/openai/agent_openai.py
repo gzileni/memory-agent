@@ -32,3 +32,6 @@ class AgentOpenAI(MemoryAgent):
             "dims": self.mem._get_collection_dim(),
             "fields": ["$"]
         }
+
+    def embed_query(self, text: str) -> list[float]:
+        return self.mem.model_embedding.embed_query(text)

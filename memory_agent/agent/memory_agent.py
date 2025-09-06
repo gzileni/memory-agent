@@ -1,3 +1,4 @@
+import os
 from typing import AsyncIterable, Any, Optional
 from langgraph.prebuilt import create_react_agent
 from langchain_core.runnables import RunnableConfig
@@ -11,9 +12,8 @@ from langmem import (
 )
 from .memory_manager import MemoryManager
 from .state import State
-from langgraph.checkpoint.redis.aio import AsyncRedisSaver
-from langgraph.store.redis.aio import AsyncRedisStore
-from abc import abstractmethod
+from langgraph.store.redis import RedisStore
+from langgraph.checkpoint.redis import RedisSaver
 
 
 class MemoryAgent(MemoryManager):
@@ -77,7 +77,7 @@ class MemoryAgent(MemoryManager):
             self.refresh_checkpointer
         )
 
-    async def create_agent(
+    def create_agent(
         self,
         checkpointer,
         **kwargs
@@ -92,16 +92,16 @@ class MemoryAgent(MemoryManager):
         """
         return create_react_agent(
             model=self.llm_model,
-            prompt=self._prompt,
-            tools=await self._get_tools(),
-            store=self.vector_store,
+            tools=self._get_tools(),
             state_schema=State,
             pre_model_hook=self.summarize_node,
             checkpointer=checkpointer,
+            prompt=self._prompt,
+            store=self.vector_store,
             **kwargs
         )
 
-    async def _get_tools(self):
+    def _get_tools(self):
         """
         Get the tools available for the agent.
         Returns:
@@ -150,56 +150,13 @@ class MemoryAgent(MemoryManager):
         if self.session_id:
             config["configurable"]["session_id"] = self.session_id
 
-        input_data = {"messages": [{"role": "user", "content": prompt}]}
-        return config, input_data
+        return config
 
-    def _response(
+    def _process_event(
         self,
-        thread_id: str,
-        result: dict | None,
-        error: dict | None
-    ) -> dict:
-        """
-        Get the agent's response based on the current state.
-        Args:
-            thread_id (str): The ID of the thread.
-            result (dict | None): The result of the agent's processing.
-            error (dict | None): Any error that occurred during processing.
-        Returns:
-            dict: The response to be sent back to the client.
-        """
-
-        response: dict = {
-            "jsonrpc": "2.0",
-            "id": thread_id,
-            "user_id": self.user_id,
-            "session_id": self.session_id,
-        }
-
-        if result is None and error is None:
-            raise ValueError("Both result and error are None")
-
-        if result is not None:
-            response["result"] = result
-
-        if error is not None:
-            response["error"] = error
-
-        return response
-
-    async def _refresh(self, checkpointer):
-        # Delete checkpoints older than 15 minutes
-        # for the current thread
-        if self.refresh_checkpointer:
-            await checkpointer.adelete_by_thread_id(
-                thread_id=self.thread_id,
-                filter_minutes=self.filter_minutes
-            )
-
-    async def _process_event(
-        self,
-        config, event_item: dict | None
-    ) -> tuple[dict, bool]:
+        config,
+        event_item: dict | None
+    ) -> str:
         """
         Process the event item and update memory if necessary.
         Args:
@@ -209,16 +166,7 @@ class MemoryAgent(MemoryManager):
             tuple: A tuple containing the result and a boolean indicating
             if the processing was successful.
         """
-        is_ok: bool = False
-        result: dict = {
-            'is_task_complete': False,
-            'require_user_input': True,
-            'content': (
-                'We are unable to process your request at the moment. '
-                'Please try again.'
-            )
-        }
-
+        event_response: str = ""
         if event_item is not None:
             if (
                 "messages" in event_item
@@ -239,29 +187,14 @@ class MemoryAgent(MemoryManager):
                     event_response
                     or (len(event_response) > 0)
                 ):
-                    result = {
-                        'is_task_complete': True,
-                        'require_user_input': False,
-                        'content': event_response,
-                    }
-                    await self.update_memory(
+                    self.update_memory(
                         event_messages,
                         config=config
                     )
-                    is_ok = True
 
-        return result, is_ok
+        return event_response
 
-    @abstractmethod
-    def index_store(self) -> Any:
-        """
-        Get the index store configuration.
-        Returns:
-            Any: The index store configuration.
-        """
-        pass
-
-    async def ainvoke(
+    def invoke(
         self,
         prompt: str,
         thread_id: Optional[str] = None,
@@ -281,37 +214,26 @@ class MemoryAgent(MemoryManager):
             if thread_id is not None:
                 self.thread_id = thread_id
 
-            config, input_data = self._params(
+            config = self._params(
                 prompt,
                 self.thread_id
             )
 
-            result: dict = {
-                'is_task_complete': False,
-                'require_user_input': True,
-                'content': (
-                    'We are unable to process your request at the moment. '
-                    'Please try again.'
-                )
-            }
-
             conn_string = self._redis_uri_store()
-            async with (
-                AsyncRedisStore.from_conn_string(
+            with (
+                RedisStore.from_conn_string(
                     conn_string,
                     index=self.index_store()
                 ) as store,
-                AsyncRedisSaver.from_conn_string(
-                    conn_string
-                ) as checkpointer,
+                RedisSaver.from_conn_string(conn_string) as checkpointer,
             ):
-                await store.setup()
+                store.setup()
                 self.vector_store = store
-                await self._refresh(checkpointer)
+                checkpointer.setup()
 
                 if self.agent is None:
                     self.logger.info("Creating new default agent")
-                    self.agent = await self.create_agent(
+                    self.agent = self.create_agent(
                         checkpointer,
                         **config_model
                     )
@@ -319,48 +241,32 @@ class MemoryAgent(MemoryManager):
                     self.logger.info("Using existing agent")
                     self.agent.checkpointer = checkpointer
 
-                response_agent = await self.agent.ainvoke(
+                input_data = {"messages": [
+                    {"role": "user", "content": prompt}
+                ]}
+
+                response_agent = self.agent.invoke(
                     input=input_data,
                     config=config
                 )
 
-                result, is_ok = await self._process_event(
-                    config,
-                    response_agent
+                return self._process_event(
+                    config=config,
+                    event_item=response_agent
                 )
-
-                if is_ok:
-                    return self._response(
-                        thread_id=self.thread_id,
-                        result=result,
-                        error=None
-                    )
-                else:
-                    return self._response(
-                        thread_id=self.thread_id,
-                        result=None,
-                        error={
-                            "code": 500,
-                            "message": result
-                        }
-                    )
         except Exception as e:
             self.logger.error(
                 f"Error occurred while invoking agent: {e}",
                 extra=get_metadata(thread_id=self.thread_id)
             )
-            return self._response(
-                thread_id=self.thread_id,
-                result=None,
-                error={"message": str(e)}
-            )
+            raise e
 
     async def astream(
         self,
         prompt: str,
         thread_id: Optional[str] = None,
         **kwargs_model
-    ) -> AsyncIterable[dict[str, Any]]:
+    ) -> AsyncIterable[str]:
         """
         Asynchronously streams response chunks from the agent based
         on the provided prompt.
@@ -376,40 +282,25 @@ class MemoryAgent(MemoryManager):
         if thread_id is not None:
             self.thread_id = thread_id
 
-        result: dict = {
-            'is_task_complete': False,
-            'require_user_input': True,
-            'content': (
-                'We are unable to process your request at the moment. '
-                'Please try again.'
-            )
-        }
-
         try:
 
-            config, input_data = self._params(
+            config = self._params(
                 prompt,
                 self.thread_id
             )
 
             conn_string = self._redis_uri_store()
-            index_s = self.index_store()
-            async with (
-                AsyncRedisStore.from_conn_string(
-                    conn_string,
-                    index=index_s
-                ) as store,
-                AsyncRedisSaver.from_conn_string(
-                    conn_string
-                ) as checkpointer,
+            with (
+                RedisStore.from_conn_string(conn_string) as store,
+                RedisSaver.from_conn_string(conn_string) as checkpointer,
             ):
-                await store.setup()
+                store.setup()
                 self.vector_store = store
-                await self._refresh(checkpointer)
+                checkpointer.setup()
 
                 if self.agent is None:
                     self.logger.info("Creating new default agent")
-                    self.agent = await self.create_agent(
+                    self.agent = self.create_agent(
                         checkpointer,
                         **kwargs_model
                     )
@@ -417,12 +308,19 @@ class MemoryAgent(MemoryManager):
                     self.logger.info("Using existing agent")
                     self.agent.checkpointer = checkpointer
 
+                input_data = {"messages": [
+                    {"role": "user", "content": prompt}
+                ]}
+
                 index: int = 1
-                async for event in self.agent.astream(
+                events = self.agent.stream(
                     input=input_data,
                     config=config,
-                    stream_mode="updates"
-                ):
+                    stream_mode="updates",
+                    debug=os.getenv("APP_ENV") == "development"
+                )
+
+                for event in events:
                     event_index: str = f"Event {index}"
                     self.logger.debug(
                         f">>> {event_index} received: {event}",
@@ -439,47 +337,21 @@ class MemoryAgent(MemoryManager):
                             agent_process,
                             extra=get_metadata(thread_id=self.thread_id)
                         )
-                        result = {
-                            'is_task_complete': True,
-                            'require_user_input': False,
-                            'content': agent_process,
-                        }
-                        yield self._response(
-                            thread_id=self.thread_id,
-                            result=result,
-                            error=None
-                        )
 
                     elif "tools" in event:
                         event_item = event["tools"]
                         tool_process: str = (
-                            f'{event_index} - Processing the knowledge base...'
+                            f'{event_index} - Processing the tools...'
                         )
                         self.logger.debug(
                             tool_process,
                             extra=get_metadata(thread_id=self.thread_id)
                         )
-                        result = {
-                            'is_task_complete': False,
-                            'require_user_input': False,
-                            'content': tool_process,
-                        }
-                        yield self._response(
-                            thread_id=self.thread_id,
-                            result=result,
-                            error=None
-                        )
 
-                    result, is_ok = await self._process_event(
-                        config,
-                        event_item
-                    )
-
-                    if is_ok:
-                        yield self._response(
-                            thread_id=self.thread_id,
-                            result=result,
-                            error=None
+                    if event_item is not None:
+                        yield self._process_event(
+                            config=config,
+                            event_item=event_item
                         )
                     index += 1
 
@@ -488,13 +360,5 @@ class MemoryAgent(MemoryManager):
             self.logger.error(
                 f"Error occurred while processing event: {str(e)}",
                 extra=get_metadata(thread_id=self.thread_id)
-            )
-            yield self._response(
-                thread_id=self.thread_id,
-                result=result,
-                error={
-                    "code": 500,
-                    "message": str(e)
-                }
             )
             raise e
