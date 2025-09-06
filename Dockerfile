@@ -52,6 +52,18 @@ COPY neo4j.conf /etc/neo4j/neo4j.conf
 # Neo4J ports
 EXPOSE 7474 7687
 
+# Aggiungi solo libssl1.1 da bullseye-security con pinning
+RUN set -eux; \
+  apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg; \
+  echo 'deb http://security.debian.org/debian-security bullseye-security main' \
+    > /etc/apt/sources.list.d/bullseye-security.list; \
+  printf 'Package: libssl1.1\nPin: release n=bullseye\nPin-Priority: 990\n' \
+    > /etc/apt/preferences.d/libssl1.1.pref; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends libssl1.1; \
+  rm -rf /var/lib/apt/lists/*
+
+
 # Installazione Redis Stack (APT ufficiale Redis)
 # --- Redis Stack (APT ufficiale, con fallback codename) ---
 # --- Redis CLI dagli apt Debian (bookworm) ---
