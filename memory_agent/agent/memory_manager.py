@@ -388,6 +388,9 @@ class MemoryManager:
                 **kwargs
             )
 
+            if messages is None or len(messages) == 0:
+                raise ValueError("Messages cannot be None or empty.")
+
             input: Any = {"messages": messages}
 
             return mem.invoke(

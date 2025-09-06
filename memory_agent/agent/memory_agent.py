@@ -261,7 +261,7 @@ class MemoryAgent(MemoryManager):
             )
             raise e
 
-    async def astream(
+    async def stream(
         self,
         prompt: str,
         thread_id: Optional[str] = None,

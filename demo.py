@@ -70,15 +70,15 @@ async def run_agent(msg: str):
 
 
 async def run_agent_stream(msg: str):
-    async for token in agent.astream(msg):
+    async for token in agent.stream(msg):
         print(token)
 
 
 async def main():
     msg = "My name is Giuseppe. Remember that."
     await run_agent(msg)
-    # msg = "What is the capital of France?"
-    # await run_agent_stream(msg)
+    msg = "What is the capital of France?"
+    await run_agent_stream(msg)
     msg = "What is my name?"
     await run_agent_stream(msg)
 
