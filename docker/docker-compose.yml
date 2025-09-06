@@ -8,7 +8,8 @@ services:
       - dev
     restart: always
     # image: ghcr.io/gzileni/memory-agent:cpu
-    image: memory-agent
+    image: memory-agent:latest
+    pull_policy: never
     ports:
       - "8000:8000"
       - "6379:6379"   # Redis
