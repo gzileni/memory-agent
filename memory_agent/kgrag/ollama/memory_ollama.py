@@ -1,4 +1,4 @@
-from memory_agent.memory_graph import MemoryGraph
+from memory_agent.kgrag.memory_graph import MemoryGraph
 from typing import Any
 from langchain_ollama import OllamaEmbeddings
 from langgraph.store.base import IndexConfig

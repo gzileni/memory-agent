@@ -1,6 +1,6 @@
 import uuid
 import asyncio
-from memory_agent.ollama import AgentOllama
+from memory_agent.agent.ollama import AgentOllama
 from qdrant_client.http.models import Distance
 
 thread_id = "demo_agent_ollama"
@@ -64,9 +64,7 @@ agent = AgentOllama(
 )
 
 
-async def run_agent():
-    # use the ainvoke for non-streaming response
-    msg = "My name is Giuseppe. Remember that."
+async def run_agent(msg: str):
     response = await agent.ainvoke(msg)
     if response.get("error") is not None:
         err = response.get("error")
@@ -76,8 +74,9 @@ async def run_agent():
     result = response.get("result")
     if result is not None:
         print(result.get("content"))
-    # use the astream for streaming response
-    msg = "What is the capital of France?"
+
+
+async def run_agent_stream(msg: str):
     async for token in agent.astream(msg):
         if token.get("error") is not None:
             err = token.get("error")
@@ -88,19 +87,16 @@ async def run_agent():
         result = token.get("result")
         if result is not None:
             print(result.get("content"))
+
+
+async def main():
+    msg = "My name is Giuseppe. Remember that."
+    await run_agent(msg)
+    # msg = "What is the capital of France?"
+    # await run_agent_stream(msg)
     msg = "What is my name?"
-    async for token in agent.astream(msg):
-        if token.get("error") is not None:
-            err = token.get("error")
-            if err is not None:
-                print("Error: ", err.get("message"))
-                return
-            return
-        print("---> ", end="", flush=True)
-        result = token.get("result")
-        if result is not None:
-            print(result.get("content"))
+    await run_agent_stream(msg)
 
 
 if __name__ == "__main__":
-    asyncio.run(run_agent())
+    asyncio.run(main())

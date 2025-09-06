@@ -4,14 +4,16 @@ from langchain_core.runnables import RunnableConfig
 from langmem.short_term import SummarizationNode
 from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.graph.state import CompiledStateGraph
-from .memory_checkpointer import MemoryCheckpointer
-from .memory_log import get_metadata
+from ..memory_log import get_metadata
 from langmem import (
     create_manage_memory_tool,
     create_search_memory_tool,
 )
 from .memory_manager import MemoryManager
 from .state import State
+from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+from langgraph.store.redis.aio import AsyncRedisStore
+from abc import abstractmethod
 
 
 class MemoryAgent(MemoryManager):
@@ -92,7 +94,7 @@ class MemoryAgent(MemoryManager):
             model=self.llm_model,
             prompt=self._prompt,
             tools=await self._get_tools(),
-            store=self.store(),
+            store=self.vector_store,
             state_schema=State,
             pre_model_hook=self.summarize_node,
             checkpointer=checkpointer,
@@ -109,11 +111,11 @@ class MemoryAgent(MemoryManager):
         self.tools.extend([
             create_manage_memory_tool(
                 namespace=self.namespace,
-                store=self.store()
+                store=self.vector_store
             ),
             create_search_memory_tool(
                 namespace=self.namespace,
-                store=self.store()
+                store=self.vector_store
             )
         ])
 
@@ -122,7 +124,7 @@ class MemoryAgent(MemoryManager):
     def _params(
         self,
         prompt,
-        thread_id
+        thread_id: str
     ):
         """
         Prepares the configuration and input data for the agent
@@ -169,7 +171,9 @@ class MemoryAgent(MemoryManager):
 
         response: dict = {
             "jsonrpc": "2.0",
-            "id": thread_id
+            "id": thread_id,
+            "user_id": self.user_id,
+            "session_id": self.session_id,
         }
 
         if result is None and error is None:
@@ -192,11 +196,76 @@ class MemoryAgent(MemoryManager):
                 filter_minutes=self.filter_minutes
             )
 
+    async def _process_event(
+        self,
+        config, event_item: dict | None
+    ) -> tuple[dict, bool]:
+        """
+        Process the event item and update memory if necessary.
+        Args:
+            config: The configuration for the agent.
+            event_item (dict | None): The event item to process.
+        Returns:
+            tuple: A tuple containing the result and a boolean indicating
+            if the processing was successful.
+        """
+        is_ok: bool = False
+        result: dict = {
+            'is_task_complete': False,
+            'require_user_input': True,
+            'content': (
+                'We are unable to process your request at the moment. '
+                'Please try again.'
+            )
+        }
+
+        if event_item is not None:
+            if (
+                "messages" in event_item
+                and len(event_item["messages"]) > 0
+            ):
+                event_messages = event_item["messages"]
+                event_response = event_messages[-1].content
+                # If there are messages from the agent, return
+                # the last message
+                self.logger.info(
+                    (
+                        f">>> Response event: "
+                        f"{event_response}"
+                    ),
+                    extra=get_metadata(thread_id=self.thread_id)
+                )
+                if (
+                    event_response
+                    or (len(event_response) > 0)
+                ):
+                    result = {
+                        'is_task_complete': True,
+                        'require_user_input': False,
+                        'content': event_response,
+                    }
+                    await self.update_memory(
+                        event_messages,
+                        config=config
+                    )
+                    is_ok = True
+
+        return result, is_ok
+
+    @abstractmethod
+    def index_store(self) -> Any:
+        """
+        Get the index store configuration.
+        Returns:
+            Any: The index store configuration.
+        """
+        pass
+
     async def ainvoke(
         self,
         prompt: str,
         thread_id: Optional[str] = None,
-        **kwargs_model
+        config_model: dict[str, Any] = {}
     ):
         """
         Asynchronously runs the agent with the given prompt.
@@ -226,19 +295,25 @@ class MemoryAgent(MemoryManager):
                 )
             }
 
-            async with MemoryCheckpointer.from_conn_info(
-                host=str(self.host_persistence_config["host"]),
-                port=int(self.host_persistence_config["port"]),
-                db=int(self.host_persistence_config["db"])
-            ) as checkpointer:
-
+            conn_string = self._redis_uri_store()
+            async with (
+                AsyncRedisStore.from_conn_string(
+                    conn_string,
+                    index=self.index_store()
+                ) as store,
+                AsyncRedisSaver.from_conn_string(
+                    conn_string
+                ) as checkpointer,
+            ):
+                await store.setup()
+                self.vector_store = store
                 await self._refresh(checkpointer)
 
                 if self.agent is None:
                     self.logger.info("Creating new default agent")
                     self.agent = await self.create_agent(
                         checkpointer,
-                        **kwargs_model
+                        **config_model
                     )
                 else:
                     self.logger.info("Using existing agent")
@@ -249,34 +324,26 @@ class MemoryAgent(MemoryManager):
                     config=config
                 )
 
-                if (
-                    "messages" in response_agent
-                    and len(response_agent["messages"]) > 0
-                ):
-                    event_messages = response_agent["messages"]
-                    event_response = event_messages[-1].content
-                    # If there are messages from the agent,
-                    # return the last message
-                    self.logger.info(
-                        (
-                            f">>> Response event from agent: "
-                            f"{event_response}"
-                        ),
-                        extra=get_metadata(thread_id=self.thread_id)
-                    )
-
-                    result["content"] = event_response
-
-                    await self.update_memory(
-                        event_response,
-                        config=config
-                    )
-
-                return self._response(
-                    thread_id=self.thread_id,
-                    result=result,
-                    error=None
+                result, is_ok = await self._process_event(
+                    config,
+                    response_agent
                 )
+
+                if is_ok:
+                    return self._response(
+                        thread_id=self.thread_id,
+                        result=result,
+                        error=None
+                    )
+                else:
+                    return self._response(
+                        thread_id=self.thread_id,
+                        result=None,
+                        error={
+                            "code": 500,
+                            "message": result
+                        }
+                    )
         except Exception as e:
             self.logger.error(
                 f"Error occurred while invoking agent: {e}",
@@ -325,14 +392,19 @@ class MemoryAgent(MemoryManager):
                 self.thread_id
             )
 
-            async with MemoryCheckpointer.from_conn_info(
-                    host=str(self.host_persistence_config["host"]),
-                    port=int(self.host_persistence_config["port"]),
-                    db=int(self.host_persistence_config["db"])
-            ) as checkpointer:
-
-                # Delete checkpoints older than 15 minutes
-                # for the current thread
+            conn_string = self._redis_uri_store()
+            index_s = self.index_store()
+            async with (
+                AsyncRedisStore.from_conn_string(
+                    conn_string,
+                    index=index_s
+                ) as store,
+                AsyncRedisSaver.from_conn_string(
+                    conn_string
+                ) as checkpointer,
+            ):
+                await store.setup()
+                self.vector_store = store
                 await self._refresh(checkpointer)
 
                 if self.agent is None:
@@ -361,7 +433,7 @@ class MemoryAgent(MemoryManager):
                     if "agent" in event:
                         event_item = event["agent"]
                         agent_process: str = (
-                            f'{event_index} - Looking up the knowledge base...'
+                            f'{event_index} - Looking up the response agent...'
                         )
                         self.logger.debug(
                             agent_process,
@@ -387,7 +459,7 @@ class MemoryAgent(MemoryManager):
                             tool_process,
                             extra=get_metadata(thread_id=self.thread_id)
                         )
-                        result["content"] = {
+                        result = {
                             'is_task_complete': False,
                             'require_user_input': False,
                             'content': tool_process,
@@ -398,42 +470,17 @@ class MemoryAgent(MemoryManager):
                             error=None
                         )
 
-                    if event_item is not None:
-                        if (
-                            "messages" in event_item
-                            and len(event_item["messages"]) > 0
-                        ):
-                            event_messages = event_item["messages"]
-                            event_response = event_messages[-1].content
-                            # If there are messages from the agent, return
-                            # the last message
-                            self.logger.info(
-                                (
-                                    f">>> Response event from agent: "
-                                    f"{event_response}"
-                                ),
-                                extra=get_metadata(thread_id=self.thread_id)
-                            )
-                            if (
-                                event_response
-                                or (len(event_response) > 0)
-                            ):
-                                result["content"] = {
-                                    'is_task_complete': True,
-                                    'require_user_input': False,
-                                    'content': event_response,
-                                }
+                    result, is_ok = await self._process_event(
+                        config,
+                        event_item
+                    )
 
-                                await self.update_memory(
-                                    event_response,
-                                    config=config
-                                )
-
-                                yield self._response(
-                                    thread_id=self.thread_id,
-                                    result=result,
-                                    error=None
-                                )
+                    if is_ok:
+                        yield self._response(
+                            thread_id=self.thread_id,
+                            result=result,
+                            error=None
+                        )
                     index += 1
 
         except Exception as e:

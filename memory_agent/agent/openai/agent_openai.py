@@ -1,7 +1,7 @@
 import os
-from memory_agent.memory_agent import MemoryAgent
-from memory_agent.openai import MemoryOpenAI
-from langgraph.store.memory import InMemoryStore
+from memory_agent.agent.memory_agent import MemoryAgent
+from memory_agent.kgrag.openai import MemoryOpenAI
+from typing import Any
 
 
 class AgentOpenAI(MemoryAgent):
@@ -12,15 +12,12 @@ class AgentOpenAI(MemoryAgent):
         key_search (str): The key to use for searching memories.
         mem (MemoryOpenAI): The memory instance to use for the agent.
     """
+
     mem: MemoryOpenAI
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        self.mem = MemoryOpenAI(
-            **kwargs
-        )
-
+        self.mem = MemoryOpenAI(**kwargs)
         self.llm_config = {
             "model": "gpt-4.1-mini",
             "model_provider": "openai",
@@ -29,5 +26,9 @@ class AgentOpenAI(MemoryAgent):
             "temperature": self.TEMPERATURE_DEFAULT,
         }
 
-    def store(self) -> InMemoryStore:
-        return self.mem.in_memory_store()
+    def index_store(self) -> Any:
+        return {
+            "embed": self.mem.model_embedding,
+            "dims": self.mem._get_collection_dim(),
+            "fields": ["$"]
+        }

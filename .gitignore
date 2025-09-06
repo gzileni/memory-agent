@@ -59,6 +59,7 @@ test.*
 .vscode/
 
 install_build.sh
+merge.sh
 dist/
 build/
 

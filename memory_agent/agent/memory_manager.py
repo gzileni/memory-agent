@@ -6,9 +6,7 @@ from langmem import (
 )
 from .memory_schemas import Episode, UserProfile, Triple
 from typing import Literal
-from .memory_log import get_logger
-from abc import abstractmethod
-from langgraph.store.memory import InMemoryStore
+from memory_agent import get_logger
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.config import get_store
@@ -111,6 +109,7 @@ class MemoryManager:
         "db": 0,
         "decode_responses": True
     }
+    vector_store: Any
 
     def __init__(self, **kwargs):
         """
@@ -187,6 +186,17 @@ class MemoryManager:
             self.session_id,
         )
 
+    def _redis_uri_store(self) -> str:
+        """
+        Create a Redis URI from the host persistence configuration.
+        Returns:
+            str: The Redis URI.
+        """
+        host = self.host_persistence_config["host"]
+        port = self.host_persistence_config["port"]
+        db = self.host_persistence_config["db"]
+        return f"redis://{host}:{port}/{db}"
+
     def _prompt(self, state):
         """
         Prepare the messages for the LLM.
@@ -252,18 +262,9 @@ class MemoryManager:
             schemas=schemas,
             instructions=instructions,
             namespace=namespace,
-            store=self.store(),
+            store=self.vector_store,
             **kwargs,
         )
-
-    @abstractmethod
-    def store(self) -> InMemoryStore:
-        """
-        Get the in-memory store for the agent.
-        Returns:
-            InMemoryStore: The in-memory store for the agent.
-        """
-        pass
 
     def _get_similar(
         self,
@@ -276,13 +277,19 @@ class MemoryManager:
             messages: The list of messages to find similarities.
             namespace: The namespace to use for the search.
         """
-        store = get_store()
-        return store.search(
-            # Search within the same namespace as the one
-            # we've configured for the agent
-            self.namespace,
-            query=state["messages"][-1].content,
-        )
+        try:
+            store = get_store()
+            query = state["messages"][-1].content
+            similar = store.search(
+                # Search within the same namespace as the one
+                # we've configured for the agent
+                self.namespace,
+                query=query,
+            )
+            return similar
+        except Exception as e:
+            self.logger.error("Error searching for similar memories: %s", e)
+            raise e
 
     def _create_model(
         self,
@@ -301,7 +308,6 @@ class MemoryManager:
         self,
         messages,
         config: RunnableConfig,
-        store_type: MemoryStoreType = "semantic",
         delay: int = 10,
         **kwargs
     ):
@@ -319,13 +325,13 @@ class MemoryManager:
 
         # validate store_type against allowed values
         allowed_store_types = ("episodic", "user", "semantic")
-        if store_type not in allowed_store_types:
+        if self.store_type not in allowed_store_types:
             raise ValueError(
                 f"store_type must be one of {allowed_store_types}"
             )
 
         # Determine namespace based on store_type
-        if store_type == "episodic":
+        if self.store_type == "episodic":
             instructions = (
                 "Extract examples of successful explanations, "
                 "capturing the full chain of reasoning. "
@@ -333,7 +339,7 @@ class MemoryManager:
                 "logic of your reasoning."
             )
             schemas = [Episode]
-        elif store_type == "user":
+        elif self.store_type == "user":
             instructions = (
                 "Extract user profile information"
             )
@@ -357,7 +363,7 @@ class MemoryManager:
         if self.action_type == "background":
             executor = ReflectionExecutor(
                 mem,
-                store=self.store()
+                store=self.vector_store
             )
 
             return executor.submit(

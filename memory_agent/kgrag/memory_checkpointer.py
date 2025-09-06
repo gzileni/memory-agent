@@ -22,7 +22,7 @@ from langgraph.checkpoint.base import (
     PendingWrite,
 )
 from redis.asyncio import Redis as AsyncRedis
-from .memory_log import get_metadata, get_logger
+from ..memory_log import get_metadata, get_logger
 from .memory_redis import (_make_redis_checkpoint_key,
                            _make_redis_checkpoint_writes_key,
                            _parse_redis_checkpoint_key,

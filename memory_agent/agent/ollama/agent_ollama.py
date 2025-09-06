@@ -1,14 +1,15 @@
 import json
 import requests
-from memory_agent.memory_agent import MemoryAgent
-from memory_agent.ollama import MemoryOllama
-from langgraph.store.memory import InMemoryStore
+from memory_agent.agent.memory_agent import MemoryAgent
+from memory_agent.kgrag.ollama import MemoryOllama
+from typing import Any
 
 
 class AgentOllama(MemoryAgent):
     """
     An agent for managing and utilizing memory with the Ollama model.
     """
+
     mem: MemoryOllama
 
     def __init__(self, **kwargs):
@@ -20,9 +21,7 @@ class AgentOllama(MemoryAgent):
             mem (MemoryOllama): The memory instance to use for the agent.
         """
         super().__init__(**kwargs)
-        self.mem = MemoryOllama(
-            **kwargs
-        )
+        self.mem = MemoryOllama(**kwargs)
         self.llm_config = {
             "model": "llama3.1",
             "model_provider": "ollama",
@@ -31,9 +30,6 @@ class AgentOllama(MemoryAgent):
             "temperature": self.TEMPERATURE_DEFAULT,
         }
         self.ollama_pull()
-
-    def store(self) -> InMemoryStore:
-        return self.mem.in_memory_store()
 
     def ollama_pull(self) -> tuple[bool, str]:
         """
@@ -95,3 +91,10 @@ class AgentOllama(MemoryAgent):
                         self.logger.debug("Streaming output:", data)
 
         return error, response
+
+    def index_store(self) -> Any:
+        return {
+            "embed": self.mem.model_embedding,
+            "dims": self.mem._get_collection_dim(),
+            "fields": ["$"]
+        }

@@ -9,7 +9,6 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from fastembed.common.model_description import PoolingType, ModelSource
 from fastembed import TextEmbedding
-from typing import Optional
 
 
 TypeEmbeddingModelVs = Literal["local", "hf"]
@@ -203,8 +202,7 @@ class MemoryPersistence(MemoryStore):
         self.qdrant_client.set_model(model_name)
 
     async def get_vector_store(
-        self,
-        collection: Optional[str] = None
+        self
     ) -> QdrantVectorStore:
         """
         Get or create a Qdrant vector store for the specified collection.
@@ -287,7 +285,7 @@ class MemoryPersistence(MemoryStore):
             )
         ]
 
-        vs = await self.get_vector_store(collection=collection)
+        vs = await self.get_vector_store()
 
         return await vs.asimilarity_search(
             query=query,
@@ -299,8 +297,7 @@ class MemoryPersistence(MemoryStore):
         self,
         last_message: str,
         thread: str | None = None,
-        custom_metadata: dict[str, Any] | None = None,
-        collection: str | None = None
+        custom_metadata: dict[str, Any] | None = None
     ):
         """
         Save the last message to the Qdrant vector store.
@@ -325,7 +322,7 @@ class MemoryPersistence(MemoryStore):
             metadata["custom"] = custom_metadata
 
         # Save the response to the database
-        vs = await self.get_vector_store(collection=collection)
+        vs = await self.get_vector_store()
         if last_message is not None and last_message != "":
             doc_id = str(uuid.uuid4())
             message_doc = Document(
@@ -395,7 +392,6 @@ class MemoryPersistence(MemoryStore):
         """
 
         headers = kwargs.get("headers", None)
-        collection = kwargs.get("collection", "retriever")
 
         # Load documents from the provided URLs using WebBaseLoader
         docs = [
@@ -413,7 +409,7 @@ class MemoryPersistence(MemoryStore):
         doc_splits = text_splitter.split_documents(docs_list)
 
         # Initialize the vector store and add the document splits
-        vs = await self.get_vector_store(collection=collection)
+        vs = await self.get_vector_store()
         await vs.aadd_documents(doc_splits)
 
         # Return the Qdrant retriever
@@ -472,8 +468,7 @@ class MemoryPersistence(MemoryStore):
 
     async def add_documents_async(
         self,
-        documents: list[Document],
-        collection: str | None = None
+        documents: list[Document]
     ):
         """
         Adds documents to the vector store, checking if they already exist.
@@ -482,7 +477,7 @@ class MemoryPersistence(MemoryStore):
             documents (List[Document]): A list of documents to add.
         """
         new_documents = []
-        vs = await self.get_vector_store(collection=collection)
+        vs = await self.get_vector_store()
 
         for doc in documents:
             # Check if the document already exists in the vector store

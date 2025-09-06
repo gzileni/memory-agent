@@ -4,7 +4,7 @@ from abc import abstractmethod
 from typing import Any
 from langgraph.store.memory import InMemoryStore
 from langgraph.store.base import IndexConfig
-from .memory_log import get_logger
+from memory_agent import get_logger
 
 
 class MemoryStore:

@@ -16,13 +16,10 @@ from langchain_community.document_loaders import (CSVLoader,
                                                   PyPDFLoader,
                                                   JSONLoader)
 from memory_agent.memory_log import get_metadata
-from memory_agent.kgrag import (
-    GraphComponents,
-    AGENT_PROMPT,
-    parser_prompt,
-    MemoryRedisCacheRetriever,
-    print_progress_bar
-)
+from .components import GraphComponents
+from .utils import print_progress_bar
+from .prompts import AGENT_PROMPT, parser_prompt
+from .cache import MemoryRedisCacheRetriever
 from abc import abstractmethod
 from langchain_core.runnables import RunnableSerializable
 from pyaws_s3 import S3Client
@@ -30,7 +27,7 @@ from qdrant_client.models import PointStruct
 from langchain_ollama import OllamaEmbeddings
 from neo4j_graphrag.retrievers import QdrantNeo4jRetriever
 from langchain_openai import OpenAIEmbeddings
-from memory_agent.memory_persistence import MemoryPersistence
+from .memory_persistence import MemoryPersistence
 
 PathType = Literal["fs", "s3"]
 FormatFile = Literal["pdf", "csv", "json"]
