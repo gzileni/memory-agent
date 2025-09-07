@@ -52,11 +52,14 @@ COPY neo4j.conf /etc/neo4j/neo4j.conf
 # Neo4J ports
 EXPOSE 7474 7687
 
-# Aggiungi solo libssl1.1 da bullseye-security con pinning
+# Aggiungi libssl1.1 da Debian Bullseye con pinning e keyring corretti
 RUN set -eux; \
-  apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg; \
-  echo 'deb http://security.debian.org/debian-security bullseye-security main' \
-    > /etc/apt/sources.list.d/bullseye-security.list; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends ca-certificates curl gnupg debian-archive-keyring; \
+  echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://deb.debian.org/debian bullseye main' \
+    > /etc/apt/sources.list.d/debian-bullseye.list; \
+  echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] https://deb.debian.org/debian-security bullseye-security main' \
+    > /etc/apt/sources.list.d/debian-bullseye-security.list; \
   printf 'Package: libssl1.1\nPin: release n=bullseye\nPin-Priority: 990\n' \
     > /etc/apt/preferences.d/libssl1.1.pref; \
   apt-get update; \
