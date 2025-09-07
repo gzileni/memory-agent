@@ -6,7 +6,7 @@
 
 The library allows managing both [**persistence**](https://langchain-ai.github.io/langgraph/how-tos/persistence/) and [**memory**](https://langchain-ai.github.io/langgraph/concepts/memory/#what-is-memory) for a **LangGraph** agent.
 
-**memory-agent** uses **Redis** as the backend for **short‑term memory** and **Qdrant** for **long‑term persistence** and **semantic search**.
+**memory-agent** uses **Redis** as the backend for **short‑term memory** and **long‑term persistence** and **semantic search**.
 
 ![memory-agent](./memory-agent.jpeg)
 
@@ -41,7 +41,7 @@ The library allows managing both [**persistence**](https://langchain-ai.github.i
 | Function        | Database | Why |
 |-----------------|----------|-----|
 | **Memory**      | Redis    | Performance, TTL, fast session context |
-| **Persistence** | Qdrant   | Vector search, long‑term storage |
+| **Persistence** | Redis    | Vector search, long‑term storage |
 
 ---
 
@@ -61,7 +61,7 @@ For local use with **Ollama** or local embeddings:
 
 The examples show how to configure the agent, send messages (including **streaming**) and share memory between different agents.
 
-### 1) `demo.py` — Quick start with Ollama + memory
+### 1) [`demo.py`](./demo.py) — Quick start with Ollama + memory
 
 What it does:
 1. Saves to context: `"My name is Giuseppe. Remember that."`  
@@ -108,7 +108,7 @@ What to expect:
 
 ---
 
-### 2) `demo_config.py` — Centralized configuration
+### 2) [`demo_config.py`](./demo_config.py) — Centralized configuration
 
 This file defines **all parameters** used by the examples:
 
@@ -148,7 +148,7 @@ This file defines **all parameters** used by the examples:
 
 ---
 
-### 3) `demo_mem_shared.py` — Shared memory between two agents (LangGraph)
+### 3) [`demo_mem_shared.py`](./demo_mem_shared.py) — Shared memory between two agents (LangGraph)
 
 This example shows how **two distinct agents** can **share the same memory**.  
 The idea is to create two `AgentOllama` instances (e.g., `agent_1` and `agent_2`) that use **the same backends** (Redis + Qdrant) and **the same relevant identifiers** (e.g., collection, user, thread), so that what the first agent stores is available to the second.
@@ -181,19 +181,19 @@ python demo_mem_shared.py
 ## ⚙️ Prerequisites
 
 - **Redis** running (used for short‑term memory)
-- **Qdrant** running (used for persistence and vector search)
 - **Ollama** running (LLM and optionally embeddings)
+- **OpenAI** API KEY to make request to OpenAI API
 - Correct variables/URLs in `demo_config.py`
 
-Quick Docker hint:  
-- Qdrant: `docker run -p 6333:6333 qdrant/qdrant`  
-- Redis: `docker run -p 6379:6379 redis`
+---
+
+## [Docker](./docker/README.md)
 
 ---
 
 ## 🧪 Tips
 
-- For **multi‑worker** environments, ensure `thread_id`, `user_id` and collection keys are consistent across processes that need to share memory.  
+- For **multi‑worker** environments, ensure `thread_id`, `user_id` and `session_id` and collection keys are consistent across processes that need to share memory.  
 - To separate memories of different agents, use **distinct session/thread IDs** or different collections in Qdrant.  
 - Tune model `temperature` and pruning/summarization parameters to balance cost/quality/context.
 
