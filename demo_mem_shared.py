@@ -11,9 +11,8 @@ from demo_config import (
     qdrant_config,
     collection_config
 )
-
 # semantic manage the memory and Ollama as LLM
-agent = AgentOllama(
+agent_1 = AgentOllama(
     thread_id=thread_id,
     user_id=user_id,
     session_id=session_id,
@@ -28,24 +27,36 @@ agent = AgentOllama(
     store_type="semantic"
 )
 
+agent_2 = AgentOllama(
+    thread_id=thread_id,
+    user_id=user_id,
+    session_id=session_id,
+    # https://python.langchain.com/api_reference/langchain/chat_models/langchain.chat_models.base.init_chat_model.html
+    llm_config=model_ollama,
+    collection_config=collection_config,
+    store_type="semantic"
+)
 
-async def run_agent(msg: str):
-    response = agent.invoke(msg)
-    print(response)
+
+async def run_agent_1(msg: str):
+    response = agent_1.invoke(msg)
+    print(f"Agent 1 response: {response}")
 
 
-async def run_agent_stream(msg: str):
-    async for token in agent.stream(msg):
-        print(token)
+async def run_agent_2(msg: str):
+    response = agent_2.invoke(msg)
+    print(f"Agent 2 response: {response}")
 
 
 async def main():
+    print("----")
+    print("Running Agent 1\n")
     msg = "My name is Giuseppe. Remember that."
-    await run_agent(msg)
-    msg = "What is the capital of France?"
-    await run_agent_stream(msg)
+    await run_agent_1(msg)
+    print("----")
+    print("Running Agent 2\n")
     msg = "What is my name?"
-    await run_agent_stream(msg)
+    await run_agent_2(msg)
 
 
 if __name__ == "__main__":

@@ -123,8 +123,10 @@ class MemoryAgent(MemoryManager):
 
     def _params(
         self,
-        prompt,
-        thread_id: str
+        thread_id: str,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        **kwargs
     ):
         """
         Prepares the configuration and input data for the agent
@@ -137,18 +139,24 @@ class MemoryAgent(MemoryManager):
             tuple: A tuple containing the configuration for the agent
             and the input data structured for processing.
         """
+
+        max_recursion_limit = kwargs.get(
+            "max_recursion_limit",
+            self.max_recursion_limit
+        )
+
         config: RunnableConfig = {
             "configurable": {
                 "thread_id": thread_id,
-                "recursion_limit": self.max_recursion_limit,
+                "recursion_limit": max_recursion_limit,
             }
         }
 
-        if self.user_id:
-            config["configurable"]["user_id"] = self.user_id
+        if user_id:
+            config["configurable"]["user_id"] = user_id
 
-        if self.session_id:
-            config["configurable"]["session_id"] = self.session_id
+        if session_id:
+            config["configurable"]["session_id"] = session_id
 
         return config
 
@@ -198,6 +206,8 @@ class MemoryAgent(MemoryManager):
         self,
         prompt: str,
         thread_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
         config_model: dict[str, Any] = {}
     ):
         """
@@ -214,9 +224,16 @@ class MemoryAgent(MemoryManager):
             if thread_id is not None:
                 self.thread_id = thread_id
 
+            if user_id is not None:
+                self.user_id = user_id
+
+            if session_id is not None:
+                self.session_id = session_id
+
             config = self._params(
-                prompt,
-                self.thread_id
+                self.thread_id,
+                self.user_id,
+                self.session_id
             )
 
             conn_string = self._redis_uri_store()
@@ -265,6 +282,8 @@ class MemoryAgent(MemoryManager):
         self,
         prompt: str,
         thread_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
         **kwargs_model
     ) -> AsyncIterable[str]:
         """
@@ -282,11 +301,18 @@ class MemoryAgent(MemoryManager):
         if thread_id is not None:
             self.thread_id = thread_id
 
+        if user_id is not None:
+            self.user_id = user_id
+
+        if session_id is not None:
+            self.session_id = session_id
+
         try:
 
             config = self._params(
-                prompt,
-                self.thread_id
+                self.thread_id,
+                self.user_id,
+                self.session_id
             )
 
             conn_string = self._redis_uri_store()
