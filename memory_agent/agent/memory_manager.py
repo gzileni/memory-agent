@@ -42,9 +42,6 @@ class MemoryManager:
                 "episodic"
                 "user"
                 "semantic"
-        filter_minutes (int): The number of minutes to filter memories.
-            Default:
-                60
         host_persistence_config (dict[str, Any]): The configuration
             for host persistence.
             Default:
@@ -71,8 +68,6 @@ class MemoryManager:
         user_id (str): The ID of the user.
         session_id (str): The ID of the session.
         logger: The logger for the memory manager.
-        refresh_checkpointer (bool): Whether to refresh the checkpointer.
-        filter_minutes (int): The number of minutes to filter memories.
         action_type (MemoryActionType): The type of action to perform.
         store_type (MemoryStoreType): The type of memory store to use.
         llm_config (dict[str, Any]): The configuration for the LLM.
@@ -90,8 +85,6 @@ class MemoryManager:
         name="memory_store",
         loki_url=os.getenv("LOKI_URL")
     )
-    refresh_checkpointer: bool = True
-    filter_minutes: int = 60
     store_type: MemoryStoreType = "semantic"
 
     llm_config: dict[str, Any] = {
@@ -131,9 +124,6 @@ class MemoryManager:
                     "episodic"
                     "user"
                     "semantic"
-            filter_minutes (int): The number of minutes to filter memories.
-                Default:
-                    60
             host_persistence_config (dict[str, Any]): The configuration
                 for host persistence.
                 Default:
@@ -156,7 +146,6 @@ class MemoryManager:
         self.user_id = kwargs.get("user_id", self.user_id)
         self.session_id = kwargs.get("session_id", self.session_id)
         self.store_type = kwargs.get("store_type", self.store_type)
-        self.filter_minutes = kwargs.get("filter_minutes", self.filter_minutes)
         self.llm_config = kwargs.get("llm_config", self.llm_config)
         self.llm_model = self._create_model(**self.llm_config)
 

@@ -23,16 +23,14 @@ The library allows managing both [**persistence**](https://langchain-ai.github.i
   - Ollama (via `AgentOllama`) for local inference
 - **Flexible embeddings**
   - OpenAI embeddings (default)
-  - Local Hugging Face embeddings for **air‑gapped** environments
   - Ollama embeddings (e.g., `nomic-embed-text`)
 - **Automatic memory management**
   - Summarization and reflection to compress context
-  - Checkpoint pruning (e.g., `filter_minutes`)
 - **Observability**
   - Structured logging, compatible with **Grafana/Loki**
 - **Easy installation & deployment**
   - `pip install`
-  - Docker‑ready
+  - [Docker‑ready](./docker/README.md)
 
 ---
 
@@ -53,7 +51,6 @@ pip install memory-agent
 
 For local use with **Ollama** or local embeddings:
 - Install Ollama: https://ollama.ai
-- Install Hugging Face tools: `pip install --upgrade huggingface_hub`
 
 ---
 
