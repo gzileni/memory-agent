@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memory_agent"
-version = "2.0.0"
+version = "2.0.1"
 description = "A Python library for advanced memory management in AI agent applications"
 authors = [
     { name="Giuseppe Zileni", email="giuseppe.zileni@gmail.com" }
@@ -196,5 +196,13 @@ Homepage = "https://gzileni.github.io/memory-agent"
 Repository = "https://github.com/gzileni/memory-agent"
 
 [tool.setuptools]
-packages = ["memory_agent", "memory_agent.agent.*", "memory_agent.kgrag.*"]
+packages = [
+  "memory_agent",
+  "memory_agent.agent",
+  "memory_agent.agent.ollama",
+  "memory_agent.agent.openai",
+  "memory_agent.kgrag",
+  "memory_agent.kgrag.ollama",
+  "memory_agent.kgrag.openai"
+]
 
