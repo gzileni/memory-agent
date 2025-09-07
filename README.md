@@ -4,250 +4,209 @@
 [![GitHub stars](https://img.shields.io/github/stars/gzileni/memory-agent?style=social)](https://github.com/gzileni/memory-agent/stargazers)  
 [![GitHub forks](https://img.shields.io/github/forks/gzileni/memory-agent?style=social)](https://github.com/gzileni/memory-agent/network)  
 
-The library allows you to manage both [persistence](https://langchain-ai.github.io/langgraph/how-tos/persistence/) and [**memory**](https://langchain-ai.github.io/langgraph/concepts/memory/#what-is-memory) for a LangGraph agent.  
+The library allows managing both [**persistence**](https://langchain-ai.github.io/langgraph/how-tos/persistence/) and [**memory**](https://langchain-ai.github.io/langgraph/concepts/memory/#what-is-memory) for a **LangGraph** agent.
 
-**memory-agent** uses [Redis](https://redis.io/) as the short-term memory backend and [QDrant](https://qdrant.tech/) for long-term persistence and semantic search.  
+**memory-agent** uses **Redis** as the backend for **short‑term memory** and **Qdrant** for **long‑term persistence** and **semantic search**.
+
+![memory-agent](./memory-agent.jpeg)
 
 ---
 
 ## 🔑 Key Features
 
 - **Dual-layer memory system**
-  - **Short-term memory with Redis** → ultra-fast, volatile, TTL-based storage for ongoing sessions.
-  - **Long-term persistence with Qdrant** → semantic search, embeddings, and retrieval across sessions.
-- **LangGraph integration** → build fully stateful LLM-powered agents with checkpoints and memory tools.  
-- **Multi-LLM support**
-  - [OpenAI](https://platform.openai.com/) (via `AgentOpenAI`)  
-  - [Ollama](https://ollama.com/) (via `AgentOllama`) for local inference.  
-- **Embeddings flexibility**
-  - OpenAI embeddings (default).
-  - Hugging Face local embeddings for **air-gapped environments**.
-  - Ollama embeddings (`nomic-embed-text`, etc.).  
+  - **Short-term memory with Redis** → fast, volatile storage with TTL for active sessions.
+  - **Long-term persistence with Qdrant** → semantic search, embeddings, and cross‑session retrieval.
+- **Integration with LangGraph** → stateful LLM agents with checkpoints and memory tools.
+- **Multi-LLM**
+  - OpenAI (via `AgentOpenAI`)
+  - Ollama (via `AgentOllama`) for local inference
+- **Flexible embeddings**
+  - OpenAI embeddings (default)
+  - Local Hugging Face embeddings for **air‑gapped** environments
+  - Ollama embeddings (e.g., `nomic-embed-text`)
 - **Automatic memory management**
-  - Background summarization & reflection to condense context.
-  - Checkpoint pruning (`filter_minutes`) for resource control.
+  - Summarization and reflection to compress context
+  - Checkpoint pruning (e.g., `filter_minutes`)
 - **Observability**
-  - Structured logging, **Grafana/Loki compatible**.
+  - Structured logging, compatible with **Grafana/Loki**
 - **Easy installation & deployment**
-  - Simple `pip install`.
-  - Ready-to-use with **Docker** ([docs here](./docker/README.md)).  
+  - `pip install`
+  - Docker‑ready
 
 ---
 
-## Memory vs Persistence  
+## 🧠 Memory vs 🗃️ Persistence
 
-When developing agents with LangGraph (or LLM-based systems in general), it’s crucial to distinguish between **memory** and **persistence**.  
-
-### Persistence (Qdrant)
-- **Permanent storage** across sessions.  
-- **Examples:** embeddings, vector databases, long-term conversation history.  
-- **Why Qdrant?**
-  - Disk persistence.
-  - Vector similarity search at scale.
-  - Advanced queries with metadata & filters.  
-
-### Memory (Redis)
-- **Temporary state** during a conversation or workflow.  
-- **Examples:** current conversation state, volatile variables.  
-- **Why Redis?**
-  - High-performance in-RAM operations.
-  - TTL & automatic cleanup.
-  - Multi-worker support.  
-
-| Function        | Database | Main Reason                                   |
-|-----------------|----------|-----------------------------------------------|
-| **Memory**      | Redis    | Performance, TTL, fast session context        |
-| **Persistence** | Qdrant   | Vector search, scalable long-term storage     |  
+| Function        | Database | Why |
+|-----------------|----------|-----|
+| **Memory**      | Redis    | Performance, TTL, fast session context |
+| **Persistence** | Qdrant   | Vector search, long‑term storage |
 
 ---
 
-## Installation  
+## 📦 Installation
 
 ```bash
 pip install memory-agent
 ```
 
-For development with Ollama or local embeddings:  
+For local use with **Ollama** or local embeddings:
+- Install Ollama: https://ollama.ai
+- Install Hugging Face tools: `pip install --upgrade huggingface_hub`
 
+---
+
+## ▶️ Usage examples (repository root)
+
+The examples show how to configure the agent, send messages (including **streaming**) and share memory between different agents.
+
+### 1) `demo.py` — Quick start with Ollama + memory
+
+What it does:
+1. Saves to context: `"My name is Giuseppe. Remember that."`  
+2. Asks a factoid: `"What is the capital of France?"` (streaming)  
+3. Retrieves from **short‑term memory**: `"What is my name?"` (streaming)
+
+Essential snippet (simplified):
+```python
+from memory_agent.agent.ollama import AgentOllama
+from demo_config import thread_id, user_id, session_id, model_ollama, redis_config,     model_embedding_vs_config, model_embedding_config, qdrant_config, collection_config
+
+agent = AgentOllama(
+    thread_id=thread_id,
+    user_id=user_id,
+    session_id=session_id,
+    model_config=model_ollama,
+    redis_config=redis_config,
+    qdrant_config=qdrant_config,
+    collection_config=collection_config,
+    embedding_store_config=model_embedding_vs_config,
+    embedding_model_config=model_embedding_config,
+)
+
+# Non-streaming call
+text = await agent.invoke("My name is Giuseppe. Remember that.")
+
+# Streaming call
+async for token in agent.invoke_stream("What is the capital of France?"):
+    print(token, end="")
+
+# Retrieve from context
+async for token in agent.invoke_stream("What is my name?"):
+    print(token, end="")
+```
+
+Run:
 ```bash
-# Install Ollama
-https://ollama.ai  
-
-# Install Hugging Face tools
-pip install --upgrade huggingface_hub
+python demo.py
 ```
+
+What to expect:
+- On the first request the agent stores the information (“Giuseppe”).  
+- On the third request the agent should answer with the previously provided name.
 
 ---
 
-## Usage Examples  
+### 2) `demo_config.py` — Centralized configuration
 
-### OpenAI  
+This file defines **all parameters** used by the examples:
 
-```python
-import asyncio
-from memory_agent.openai import AgentOpenAI
-import os
+- **Session identifiers**:
+  ```python
+  thread_id = "thread_demo"
+  user_id = "user_demo"
+  session_id = "session_demo"
+  ```
+- **LLM model (Ollama)**:
+  ```python
+  model_ollama = {
+      "model": "llama3.1",
+      "model_provider": "ollama",
+      "api_key": None,
+      "base_url": "http://localhost:11434",
+      "temperature": 0.5,
+  }
+  ```
+- **Qdrant**:
+  ```python
+  qdrant_config = {
+      "url": "http://localhost:6333",
+  }
+  ```
+- **Embeddings (via Ollama)**:
+  ```python
+  model_embedding_config = {
+      "name": "nomic-embed-text",
+      "url": "http://localhost:11434"
+  }
+  ```
+- **Vector Store / Collection** (example): COSINE distance with `qdrant_client.http.models.Distance.COSINE`.  
+- **Redis**: connection/TTL parameters for short‑term memory.
 
-async def main():
-    agent = AgentOpenAI(
-        key_search="agent_openai_demo",
-        model_name="gpt-4.1-mini",
-        temperature=0.2,
-        model_embedding_name="text-embedding-3-small",
-        llm_api_key=os.getenv("OPENAI_API_KEY"),
-        thread_id="thread-a"
-    )
-
-    result = await agent.ainvoke("Summarize Python 3.12 new features in 3 points.")
-    print(result)
-
-    async for chunk in agent.stream("Write a 2-sentence abstract about prompt engineering."):
-        print(chunk)
-
-asyncio.run(main())
-```
-
-#### Example — Memory per Conversation Thread
-
-```python
-import asyncio
-from memory_agent.openai import AgentOpenAI
-import os
-
-async def main():
-    agent = AgentOpenAI(
-        key_search="agent_openai_demo",
-        model_name="gpt-4.1-mini",
-        temperature=0.2,
-        model_embedding_name="text-embedding-3-small",
-        llm_api_key=os.getenv("OPENAI_API_KEY")
-    )
-
-    thread_id: str = "thread-a"
-
-    response = await agent.ainvoke(
-        "Know which display mode I prefer?",
-        thread_id=thread_id
-    )
-    print(response["messages"][-1].content)
-
-    # Save a preference in memory
-    await agent.ainvoke(
-        "dark. Remember that.",
-        thread_id=thread_id
-    )
-
-    # Continuing in the same thread (thread-a), the agent recalls the preference
-    response = await agent.ainvoke(
-        "Do you remember my display mode preference?",
-        thread_id=thread_id
-    )
-    print(response["messages"][-1].content)
-
-    thread_id: str = "thread-b"
-    response = await agent.ainvoke(
-        "Hey there. Do you remember me? What are my preferences?",
-        thread_id=thread_id
-    )
-    print(response["messages"][-1].content)
-
-asyncio.run(main())
-```
-
-### Ollama  
-
-```python
-import asyncio
-from memory_agent.ollama import AgentOllama
-
-async def main():
-    agent = AgentOllama(
-        key_search="agent_ollama_demo",
-        model_name="llama3.1",
-        base_url="http://localhost:11434",
-        temperature=0.2,
-        model_embedding_name="nomic-embed-text",
-        model_embedding_url="http://localhost:11434",
-        thread_id="thread-a"
-    )
-
-    result = await agent.ainvoke("Explain the ReAct pattern in 5 lines.")
-    print(result)
-
-    async for chunk in agent.stream("Summarize the last user message in 3 bullet points."):
-        print(chunk)
-
-asyncio.run(main())
-```
+> Modify these values to point to your Redis/Qdrant/Ollama instances. Other examples import directly from `demo_config.py`.
 
 ---
 
-## Memory Agents AI  
+### 3) `demo_mem_shared.py` — Shared memory between two agents (LangGraph)
 
-**MemoryAgent** is also an agent based on LangGraph with long-term memory able to save, search, and synthesize conversation memories.  
+This example shows how **two distinct agents** can **share the same memory**.  
+The idea is to create two `AgentOllama` instances (e.g., `agent_1` and `agent_2`) that use **the same backends** (Redis + Qdrant) and **the same relevant identifiers** (e.g., collection, user, thread), so that what the first agent stores is available to the second.
 
-- **Types of message storage**
-  - `hotpath`: explicit saves performed by the agent via tools (notes or checkpoints created consciously).  
-  - `background`: memories automatically extracted from conversations in a “subconscious” way without direct intervention.  
+Flow:
+1. `agent_1` receives: `"My name is Giuseppe. Remember that."` and stores it.  
+2. `agent_2` receives: `"What is my name?"` and retrieves the answer from shared memory.
 
-- **Memory management**
-  - Obsolete checkpoints can be removed automatically after a configurable interval.  
-  - Support for common backends: Redis (storage/checkpointer) and Qdrant (vector indexing and semantic search).  
-
-- **Key features**
-  - Orchestration of tools, prompts, and agent logic in synchronous (`ainvoke`) or streaming (`stream`) executions.  
-  - Configurable via parameters such as `thread_id`, `key_search`, `host_persistence_config`, `model_name`, etc.  
-  - Designed to easily integrate tools and memory/synthesis pipelines from the langmem/langchain ecosystem.  
-
-### Quick best practices
-- Keep a stable `thread_id` to grow memory per session/user.  
-- Use different `key_search` values for distinct roles or domains.  
-- Enable periodic checkpoint cleaning (`refresh_checkpointer=True`) to contain resource usage.  
-- Choose Redis for checkpoint persistence and Qdrant for semantic search when vector search is required.  
-
-### Configuration  
-
-Relevant parameters supported by the constructors (via `**kwargs`):  
-
-- `thread_id: str` → Unique conversation ID (default: generated UUID).  
-- `key_search: str` → Namespace/key for indexing the agent’s memories.  
-- `model_name: str` → Model name (e.g. `gpt-4.1-mini` for OpenAI, `llama3.1` for Ollama).  
-- `model_provider: Literal["openai","ollama"]` → Automatically set in wrappers.  
-- `base_url: Optional[str]` → Provider endpoint (required for self-hosted instances; default for Ollama: `http://localhost:11434`).  
-- `temperature: float` → Model creativity (if supported).  
-- `tools: list` → Additional tools to expose to the agent besides memory tools.  
-- `max_recursion_limit: int` → Maximum depth of agent steps (approximate default: `25`).  
-- `filter_minutes: int` → Time window for checkpoint cleaning (approximate default: `15`).  
-- `refresh_checkpointer: bool` → If true, cleans old checkpoints for the current `thread_id`.  
-- `host_persistence_config: dict` → Checkpointer backend configuration, e.g.:  
+Essential snippet (simplified):
 ```python
-host_persistence_config={
-        "host": "localhost",
-        "port": 6379,
-        "db": 0,
-}
+agent_1 = AgentOllama(... shared ...)
+agent_2 = AgentOllama(... shared ...)
+
+await agent_1.invoke("My name is Giuseppe. Remember that.")
+
+# The other agent pulls from the same memory
+answer = await agent_2.invoke("What is my name?")
+print(answer)  # → "Your name is Giuseppe" (expected)
 ```
 
-For OpenAI, ensure you have the ENV:  
+Run:
 ```bash
-export OPENAI_API_KEY="sk-..."
+python demo_mem_shared.py
 ```
 
----
-
-## Docker  
-
-See [Docker README](./docker/README.md) for instructions on running Redis, Qdrant, and memory-agent in containers.  
+> This pattern is useful when multiple services/workers collaborate on the same user or conversation, leveraging **Redis** for short‑term state and **Qdrant** for persistence/semantic search across sessions.
 
 ---
 
-## Troubleshooting  
+## ⚙️ Prerequisites
 
-- **Network / 401 error**: verify `OPENAI_API_KEY` (for OpenAI) or the reachability of `base_url` (for Ollama).  
-- **Model not found**: in Ollama run `ollama pull llama3.1` (or the model you want).  
-- **Token limit exceeded**: reduce `max_recursion_limit`, use lower temperature, or enable/refine short-term synthesis.  
-- **Store/Checkpointer**: if using Redis or another backend, verify `host_persistence_config`.  
+- **Redis** running (used for short‑term memory)
+- **Qdrant** running (used for persistence and vector search)
+- **Ollama** running (LLM and optionally embeddings)
+- Correct variables/URLs in `demo_config.py`
+
+Quick Docker hint:  
+- Qdrant: `docker run -p 6333:6333 qdrant/qdrant`  
+- Redis: `docker run -p 6379:6379 redis`
 
 ---
 
-Semantic Memory: https://langchain-ai.github.io/langmem/guides/extract_semantic_memories/#when-to-use-semantic-memories
+## 🧪 Tips
+
+- For **multi‑worker** environments, ensure `thread_id`, `user_id` and collection keys are consistent across processes that need to share memory.  
+- To separate memories of different agents, use **distinct session/thread IDs** or different collections in Qdrant.  
+- Tune model `temperature` and pruning/summarization parameters to balance cost/quality/context.
+
+---
+
+## 🛠️ Troubleshooting
+
+- **Doesn't retrieve memory** → check Redis reachability and that IDs (thread/user/session) are consistent between requests.  
+- **Semantic search not effective** → verify embeddings are enabled (e.g., `nomic-embed-text`) and that Qdrant has the correct collection.  
+- **Streaming prints nothing** → ensure you iterate the `invoke_stream(...)` generator and do `print(token, end="")`.
+
+---
+
+## 📄 License
+
+MIT
