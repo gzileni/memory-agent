@@ -207,6 +207,4 @@ python demo_mem_shared.py
 
 ---
 
-## 📄 License
-
-MIT
+## [📄 License MIT](./LICENSE.md)
