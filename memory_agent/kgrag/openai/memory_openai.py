@@ -49,10 +49,6 @@ class MemoryOpenAI(MemoryGraph):
         if self.llm_api_key is None:
             raise ValueError("OPENAI_API_KEY must be set")
 
-        self.model_embedding_name = kwargs.get(
-            "model_embedding_name",
-            self.model_embedding_name
-        )
         self.get_embedding_model()
 
     def get_embedding_model(self):
