@@ -36,9 +36,15 @@ async def ingestion(path: str) -> str:
     return f"Document {path} ingested successfully."
 
 
+async def query(prompt: str) -> str:
+    response = await kgrag_ollama.query(prompt)
+    return response
+
 async def main():
     path = "/Users/giuseppezileni/arxiv/2508.20435v1.pdf"
     result = await ingestion(path)
+    print(result)
+    result = await query("Come misurare empiricamente il “consumo effettivo” e stimare la CAWF?")
     print(result)
 
 if __name__ == "__main__":
