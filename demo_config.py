@@ -44,7 +44,7 @@ model_embedding_vs_config = {
 collection_config = {
     "collection_name": collection_name,
     "vectors_config": {
-        "size": 1536,
+        "size": 768,
         # COSINE = "Cosine"
         # EUCLID = "Euclid"
         # DOT = "Dot"

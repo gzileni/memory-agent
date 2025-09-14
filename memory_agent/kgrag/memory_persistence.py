@@ -63,6 +63,10 @@ class MemoryPersistence(MemoryStore):
         super().__init__(**kwargs)
 
         self.key_search = kwargs.get("key_search", "thread_agent")
+        self.collection_config = kwargs.get(
+            "collection_config",
+            self.collection_config
+        )
         self.qdrant_config = kwargs.get(
             "qdrant_config",
             self.qdrant_config
