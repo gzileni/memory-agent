@@ -22,13 +22,14 @@ class AgentOllama(MemoryAgent):
         """
         super().__init__(**kwargs)
         self.mem = MemoryOllama(**kwargs)
-        self.llm_config = {
+        llm_config_default = {
             "model": "llama3.1",
             "model_provider": "ollama",
             "api_key": None,
             "base_url": "http://localhost:11434",
             "temperature": self.TEMPERATURE_DEFAULT,
         }
+        self.llm_config = kwargs.get("llm_config", llm_config_default)
         self.ollama_pull()
 
     def ollama_pull(self) -> tuple[bool, str]:

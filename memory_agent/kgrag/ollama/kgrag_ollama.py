@@ -11,6 +11,14 @@ class KGragOllama(MemoryOllama):
         Initialize the KGragGraphOllama with the provided parameters.
         """
         super().__init__(**kwargs)
+        llm_config_default = {
+            "model": "llama3.1",
+            "model_provider": "ollama",
+            "api_key": None,
+            "base_url": "http://localhost:11434",
+            "temperature": 0.5,
+        }
+        self.llm_config = kwargs.get("llm_config", llm_config_default)
 
     def embeddings(
         self,

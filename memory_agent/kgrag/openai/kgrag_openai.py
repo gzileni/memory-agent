@@ -1,3 +1,4 @@
+import os
 from .memory_openai import MemoryOpenAI
 
 
@@ -12,6 +13,14 @@ class KGragOpenAI(MemoryOpenAI):
         Initialize the KGragGraphOpenAI with the provided parameters.
         """
         super().__init__(**kwargs)
+        openai_config_default = {
+            "model": "gpt-4.1-mini",
+            "model_provider": "openai",
+            "api_key": os.getenv("OPENAI_API_KEY"),
+            "base_url": None,
+            "temperature": 0.5,
+        }
+        self.llm_config = kwargs.get("llm_config", openai_config_default)
 
     def embeddings(
         self,

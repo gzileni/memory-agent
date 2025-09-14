@@ -63,7 +63,7 @@ services:
       - COLLECTION_NAME=${COLLECTION_NAME}
       - MODEL_EMBEDDING=${MODEL_EMBEDDING}
       - LLM_URL=${LLM_URL}
-      - LOKI_URL=http://kgrag-mcp-loki:3100/loki/api/v1/push
+      - LOKI_URL=http://memory-agent-loki:3100/loki/api/v1/push
     volumes:
       - qdrant_data:/qdrant/storage:z
       - redis_data:/data

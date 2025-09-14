@@ -18,13 +18,14 @@ class AgentOpenAI(MemoryAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.mem = MemoryOpenAI(**kwargs)
-        self.llm_config = {
+        openai_config_default = {
             "model": "gpt-4.1-mini",
             "model_provider": "openai",
             "api_key": os.getenv("OPENAI_API_KEY"),
             "base_url": None,
             "temperature": self.TEMPERATURE_DEFAULT,
         }
+        self.llm_config = kwargs.get("llm_config", openai_config_default)
 
     def index_store(self) -> Any:
         return {
