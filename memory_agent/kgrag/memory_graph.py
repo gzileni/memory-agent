@@ -167,14 +167,33 @@ class MemoryGraph(MemoryPersistence):
         """
         try:
             if self.neo4j_auth is not None:
-                self.neo4j_driver = GraphDatabase.driver(
-                    self.neo4j_auth["url"],
-                    auth=(
-                        self.neo4j_auth["username"],
-                        self.neo4j_auth["password"]
-                    ),
-                    **self.neo4j_config
-                )
+                if (
+                    self.neo4j_auth["username"] is not None
+                    and self.neo4j_auth["password"] is not None
+                ):
+                    self.logger.debug(
+                        "Connecting to Neo4j with username and password.",
+                        extra=get_metadata(thread_id=str(self.thread_id))
+                    )
+                    self.neo4j_driver = GraphDatabase.driver(
+                        self.neo4j_auth["url"],
+                        auth=(
+                            self.neo4j_auth["username"],
+                            self.neo4j_auth["password"]
+                        ),
+                        **self.neo4j_config
+                    )
+                else:
+                    self.logger.debug(
+                        "Connecting to Neo4j with no authentication.",
+                        extra=get_metadata(thread_id=str(self.thread_id))
+                    )
+
+                    self.neo4j_driver = GraphDatabase.driver(
+                        self.neo4j_auth["url"],
+                        auth=None,
+                        **self.neo4j_config
+                    )
 
                 if self.neo4j_auth['database'] is not None:
                     self.logger.debug(

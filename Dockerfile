@@ -1,3 +1,4 @@
+# check=skip=SecretsUsedInArgOrEnv
 ARG BASE_IMAGE_CPU=qdrant/qdrant:v1.15.0
 ARG BASE_IMAGE_GPU=qdrant/qdrant:gpu-nvidia-latest
 ARG PLATFORM=cpu
@@ -27,6 +28,8 @@ ENV \
   REDIS_HOST="localhost" \
   REDIS_PORT=6379 \
   REDIS_DB=10
+
+ENV NEO4J_AUTH=none
 
 # Installazione di Redis
 RUN apt-get update && \

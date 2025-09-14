@@ -68,6 +68,7 @@ class MemoryStore:
         )
         self.llm_config = kwargs.get("llm_config", self.llm_config)
         self.llm_model = self._create_model(**self.llm_config)
+        os.environ["NEO4J_AUTH"] = "none"
 
     @abstractmethod
     def get_embedding_model(self):
