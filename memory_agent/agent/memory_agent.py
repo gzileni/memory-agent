@@ -1,7 +1,6 @@
 import os
 from typing import AsyncIterable, Any, Optional
 from langgraph.prebuilt import create_react_agent
-from langchain_core.runnables import RunnableConfig
 from langmem.short_term import SummarizationNode
 from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.graph.state import CompiledStateGraph
@@ -33,7 +32,6 @@ class MemoryAgent(MemoryManager):
         stream(prompt, thread_id=None, **kwargs_model): Asynchronously stream
             response chunks.
     """
-    max_recursion_limit: int = 25
     summarize_node: SummarizationNode
     tools: list = []
     agent: Optional[CompiledStateGraph] = None
@@ -56,11 +54,6 @@ class MemoryAgent(MemoryManager):
         self.max_summary_tokens = kwargs.get(
             "max_summary_tokens",
             self.max_summary_tokens
-        )
-
-        self.max_recursion_limit = kwargs.get(
-            "max_recursion_limit",
-            self.max_recursion_limit
         )
 
         self.summarize_node = SummarizationNode(
@@ -120,45 +113,6 @@ class MemoryAgent(MemoryManager):
         ])
 
         return self.tools
-
-    def _params(
-        self,
-        thread_id: str,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        **kwargs
-    ):
-        """
-        Prepares the configuration and input data for the agent
-        based on the provided prompt and thread ID.
-        Args:
-            prompt (str): The user input prompt to be processed by the agent.
-            thread_id (str): A unique identifier for the thread,
-            used for tracking and logging.
-        Returns:
-            tuple: A tuple containing the configuration for the agent
-            and the input data structured for processing.
-        """
-
-        max_recursion_limit = kwargs.get(
-            "max_recursion_limit",
-            self.max_recursion_limit
-        )
-
-        config: RunnableConfig = {
-            "configurable": {
-                "thread_id": thread_id,
-                "recursion_limit": max_recursion_limit,
-            }
-        }
-
-        if user_id:
-            config["configurable"]["user_id"] = user_id
-
-        if session_id:
-            config["configurable"]["session_id"] = session_id
-
-        return config
 
     def _process_event(
         self,

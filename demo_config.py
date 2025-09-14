@@ -1,9 +1,25 @@
+import os
 from qdrant_client.http.models import Distance
+from typing import Any
 
 thread_id = "thread_demo"
 user_id = "user_demo"
 session_id = "session_demo"
 collection_name = "agent_ollama_demo"
+
+neo4j_auth: dict[str, Any] = {
+    "url": "neo4j://localhost:7687",
+    "username": None,
+    "password": None,
+    "database": None,
+}
+
+aws_config = {
+    "access_key_id": os.environ.get("AWS_ACCESS_KEY_ID"),
+    "secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+    "bucket": os.environ.get("AWS_BUCKET_NAME"),
+    "region": os.environ.get("AWS_REGION")
+}
 
 model_ollama = {
     "model": "llama3.1",

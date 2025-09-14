@@ -4,7 +4,7 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client.http.models import Distance
 from langchain_core.documents import Document
 from qdrant_client import models, AsyncQdrantClient, QdrantClient
-from .memory import MemoryStore
+from memory_agent.memory import MemoryStore
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from fastembed.common.model_description import PoolingType, ModelSource

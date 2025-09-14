@@ -1,24 +1,18 @@
-import uuid
-import os
 from langmem import (
     create_memory_store_manager
 )
 from .memory_schemas import Episode, UserProfile, Triple
 from typing import Literal
-from memory_agent import (
-    get_logger
-)
-from langchain.chat_models import init_chat_model
-from langchain_core.language_models.chat_models import BaseChatModel
 from typing import Any
 from langchain_core.runnables import RunnableConfig
 from abc import abstractmethod
 from langgraph.store.base import BaseStore
+from memory_agent.memory import MemoryStore
 
 MemoryStoreType = Literal["episodic", "user", "semantic"]
 
 
-class MemoryManager:
+class MemoryManager(MemoryStore):
     """
     A manager for handling memory operations within the MemoryAgent.
     Args:
@@ -75,27 +69,10 @@ class MemoryManager:
         host_persistence_config (dict[str, Any]): The configuration
             for host persistence.
     """
-
     TEMPERATURE_DEFAULT = 0.7
     namespace: tuple
-    thread_id: str = str(uuid.uuid4())
-    user_id: str = "*"
-    session_id: str = "*"
-    logger = get_logger(
-        name="memory_store",
-        loki_url=os.getenv("LOKI_URL")
-    )
     store_type: MemoryStoreType = "semantic"
 
-    llm_config: dict[str, Any] = {
-        "model": None,
-        "model_provider": None,
-        "api_key": None,
-        "base_url": None,
-        "temperature": None,
-    }
-
-    llm_model: BaseChatModel
     host_persistence_config: dict[str, Any] = {
         "host": "localhost",
         "port": 6379,
@@ -142,12 +119,8 @@ class MemoryManager:
                         "temperature": 0.7,
                     }
         """
-        self.thread_id = kwargs.get("thread_id", self.thread_id)
-        self.user_id = kwargs.get("user_id", self.user_id)
-        self.session_id = kwargs.get("session_id", self.session_id)
+        super().__init__(**kwargs)
         self.store_type = kwargs.get("store_type", self.store_type)
-        self.llm_config = kwargs.get("llm_config", self.llm_config)
-        self.llm_model = self._create_model(**self.llm_config)
 
         self.host_persistence_config = kwargs.get(
             "host_persistence_config",
@@ -308,19 +281,6 @@ class MemoryManager:
         except Exception as e:
             self.logger.error("Error searching for similar memories: %s", e)
             raise e
-
-    def _create_model(
-        self,
-        **model_config
-    ) -> BaseChatModel:
-        """
-        Get the chat model for the agent.
-        Args:
-            **model_config: The configuration for the model.
-        Returns:
-            BaseChatModel: The chat model for the agent.
-        """
-        return init_chat_model(**model_config)
 
     def update_memory(
         self,

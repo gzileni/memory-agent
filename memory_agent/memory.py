@@ -1,10 +1,13 @@
 import uuid
 import os
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Optional
 from langgraph.store.memory import InMemoryStore
 from langgraph.store.base import IndexConfig
 from memory_agent import get_logger
+from langchain.chat_models import init_chat_model
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.runnables import RunnableConfig
 
 
 class MemoryStore:
@@ -13,11 +16,24 @@ class MemoryStore:
     input and output.
     """
 
-    thread_id: str | None = str(uuid.uuid4())
+    thread_id: str = str(uuid.uuid4())
+    user_id: str = "*"
+    session_id: str = "*"
     logger = get_logger(
-        name="memory_store",
+        name="memory_agent",
         loki_url=os.getenv("LOKI_URL")
     )
+    llm_config: dict[str, Any] = {
+        "model": None,
+        "model_provider": None,
+        "api_key": None,
+        "base_url": None,
+        "temperature": None,
+    }
+
+    llm_model: BaseChatModel
+    max_recursion_limit: int = 25
+    TEMPERATURE_DEFAULT: float = 0.5
 
     def __init__(self, **kwargs: Any) -> None:
         """
@@ -44,6 +60,14 @@ class MemoryStore:
                     The path to the model embedding file.
         """
         self.thread_id = kwargs.get("thread_id", self.thread_id)
+        self.user_id = kwargs.get("user_id", self.user_id)
+        self.session_id = kwargs.get("session_id", self.session_id)
+        self.max_recursion_limit = kwargs.get(
+            "max_recursion_limit",
+            self.max_recursion_limit
+        )
+        self.llm_config = kwargs.get("llm_config", self.llm_config)
+        self.llm_model = self._create_model(**self.llm_config)
 
     @abstractmethod
     def get_embedding_model(self):
@@ -78,3 +102,55 @@ class MemoryStore:
             InMemoryStore: The in-memory store.
         """
         return InMemoryStore(index=self.memory_config())
+
+    def _create_model(
+        self,
+        **model_config
+    ) -> BaseChatModel:
+        """
+        Get the chat model for the agent.
+        Args:
+            **model_config: The configuration for the model.
+        Returns:
+            BaseChatModel: The chat model for the agent.
+        """
+        return init_chat_model(**model_config)
+
+    def _params(
+        self,
+        thread_id: str,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        **kwargs
+    ):
+        """
+        Prepares the configuration and input data for the agent
+        based on the provided prompt and thread ID.
+        Args:
+            prompt (str): The user input prompt to be processed by the agent.
+            thread_id (str): A unique identifier for the thread,
+            used for tracking and logging.
+        Returns:
+            tuple: A tuple containing the configuration for the agent
+            and the input data structured for processing.
+        """
+
+        max_recursion_limit = kwargs.get(
+            "max_recursion_limit",
+            self.max_recursion_limit
+        )
+
+        config: RunnableConfig = {
+            "configurable": {
+                "thread_id": thread_id,
+                "recursion_limit": max_recursion_limit,
+            }
+        }
+
+        if user_id:
+            config["configurable"]["user_id"] = user_id
+
+        if session_id:
+            config["configurable"]["session_id"] = session_id
+
+        return config

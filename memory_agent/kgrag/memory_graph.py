@@ -1,6 +1,5 @@
 import os
 import uuid
-import json
 import datetime
 from typing import (
     LiteralString,
@@ -18,10 +17,12 @@ from langchain_community.document_loaders import (CSVLoader,
 from memory_agent.memory_log import get_metadata
 from .components import GraphComponents
 from .utils import print_progress_bar
-from .prompts import AGENT_PROMPT, parser_prompt
+from .prompts import (
+    AGENT_PROMPT,
+    PARSER_PROMPT
+)
 from .cache import MemoryRedisCacheRetriever
 from abc import abstractmethod
-from langchain_core.runnables import RunnableSerializable
 from pyaws_s3 import S3Client
 from qdrant_client.models import PointStruct
 from langchain_ollama import OllamaEmbeddings
@@ -187,13 +188,6 @@ class MemoryGraph(MemoryPersistence):
             )
             raise ConnectionError(msg)
 
-    @abstractmethod
-    def chain(self, prompt: ChatPromptTemplate) -> RunnableSerializable:
-        """
-        Get the client LLM instance.
-        """
-        pass
-
     def delete_all_relationships(self):
         """
         Delete all relationships in the Neo4j database.
@@ -276,18 +270,30 @@ class MemoryGraph(MemoryPersistence):
             ValueError: If the OpenAI response content is None.
         """
         try:
-            prompt_parser: str = parser_prompt(prompt_user)
-
             prompt = ChatPromptTemplate.from_messages([
                 (
                     "system",
-                    prompt_parser
+                    f"{PARSER_PROMPT}"
                 ),
                 ("human", "{input_text}")
             ])
 
-            response = await self.chain(prompt).ainvoke(
-                {"input_text": prompt_text}
+            llm_struct = self.llm_model.with_structured_output(GraphComponents)
+
+            chain = (
+                prompt
+                | llm_struct
+            )
+
+            config = self._params(
+                self.thread_id,
+                self.user_id,
+                self.session_id
+            )
+
+            response = await chain.ainvoke(
+                input={"input_text": prompt_text},
+                config=config
             )
 
             if response is None:
@@ -297,15 +303,12 @@ class MemoryGraph(MemoryPersistence):
                 )
                 raise ValueError("OpenAI response content is None")
 
-            raw_content = response.content
-
-            self.logger.debug(f"Raw content from LLM: {raw_content}")
-
-            # Ensure raw_content is a JSON string
-            if not isinstance(raw_content, (str, bytes, bytearray)):
-                raw_content = json.dumps(raw_content)
-
-            return GraphComponents.model_validate_json(raw_content)
+            raw_content = response.graph   # type: ignore
+            self.logger.debug(
+                f"LLM response messages: {raw_content}",
+                extra=get_metadata(thread_id=str(self.thread_id))
+            )
+            return raw_content
         except Exception as e:
             self.logger.error(
                 f"Error during LLM parsing: {str(e)}",
@@ -537,7 +540,11 @@ class MemoryGraph(MemoryPersistence):
 
         return {"nodes": list(nodes), "edges": edges}
 
-    async def _stream(self, graph_context, user_query):
+    async def _stream(
+        self,
+        graph_context,
+        user_query
+    ):
         """
         Run the GraphRAG process using the provided
             graph context and user query.
@@ -556,9 +563,23 @@ class MemoryGraph(MemoryPersistence):
             Exception: If there is an error querying the LLM.
         """
         try:
-            input, chain = self._get_chain_graph(user_query, graph_context)
+            chain = self._get_chain_graph()
+            config = self._params(
+                self.thread_id,
+                self.user_id,
+                self.session_id
+            )
+            nodes_str: str = ", ".join(graph_context["nodes"])
+            edges_str: str = "; ".join(graph_context["edges"])
 
-            async for response in chain.astream(input):
+            async for response in chain.astream(
+                input={
+                    "nodes_str": nodes_str,
+                    "edges_str": edges_str,
+                    "user_query": user_query
+                },
+                config=config
+            ):
                 if response is None:
                     self.logger.error(
                         "OpenAI response content is None",
@@ -566,14 +587,7 @@ class MemoryGraph(MemoryPersistence):
                     )
                     raise ValueError("OpenAI response content is None")
 
-                if isinstance(response.content, list):
-                    answer_text = "\n".join(
-                        str(item) for item in response.content
-                    )
-                else:
-                    answer_text = str(response.content)
-
-                yield answer_text.strip()
+                yield response.content
 
         except Exception as e:
             self.logger.error(
@@ -601,9 +615,23 @@ class MemoryGraph(MemoryPersistence):
             Exception: If there is an error querying the LLM.
         """
         try:
-            input, chain = self._get_chain_graph(user_query, graph_context)
+            chain = self._get_chain_graph()
+            config = self._params(
+                self.thread_id,
+                self.user_id,
+                self.session_id
+            )
+            nodes_str: str = ", ".join(graph_context["nodes"])
+            edges_str: str = "; ".join(graph_context["edges"])
 
-            response = await chain.ainvoke(input)
+            response = await chain.ainvoke(
+                input={
+                    "nodes_str": nodes_str,
+                    "edges_str": edges_str,
+                    "user_query": user_query
+                },
+                config=config
+            )
 
             if response is None:
                 self.logger.error(
@@ -612,11 +640,8 @@ class MemoryGraph(MemoryPersistence):
                 )
                 raise ValueError("OpenAI response content is None")
 
-            if isinstance(response.content, list):
-                answer_text = "\n".join(str(item) for item in response.content)
-            else:
-                answer_text = str(response.content)
-            return answer_text.strip()
+            return response.content
+
         except Exception as e:
             self.logger.error(
                 f"Error during LLM processing: {str(e)}",
@@ -624,7 +649,9 @@ class MemoryGraph(MemoryPersistence):
             )
             raise e
 
-    def _get_chain_graph(self, user_query, graph_context):
+    def _get_chain_graph(
+        self
+    ):
         """
         Get the chain for processing the graph context and user query.
         Args:
@@ -633,35 +660,24 @@ class MemoryGraph(MemoryPersistence):
             graph_context (dict): A dictionary containing the graph
                 context with nodes and edges.
         Returns:
-            tuple: A tuple containing:
-                - nodes_str (str): A string representation of the nodes.
-                - edges_str (str): A string representation of the edges.
-                - chain (ChatPromptTemplate): The chain for processing
-                    the graph context and user query.
+            Any: The chain for processing the graph context and user query.
         Raises:
             ValueError: If the graph context is not provided or
                 if the user query is empty.
         """
 
-        nodes_str: str = ", ".join(graph_context["nodes"])
-        edges_str: str = "; ".join(graph_context["edges"])
-
         prompt = ChatPromptTemplate.from_messages([
-                (
-                    "system",
-                    "Provide the answer for the following question:"
-                ),
-                (
-                    "human",
-                    AGENT_PROMPT
-                )
-            ])
+            (
+                "system",
+                "Provide the answer for the following question:"
+            ),
+            (
+                "human",
+                AGENT_PROMPT
+            )
+        ])
 
-        return {
-            "nodes_str": nodes_str,
-            "edges_str": edges_str,
-            "user_query": user_query
-        }, self.chain(prompt=prompt)
+        return prompt | self.llm_model
 
     async def _ingestion_batch(
         self,
