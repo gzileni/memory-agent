@@ -6,7 +6,11 @@ from typing import (
     AsyncGenerator,
     Any,
     Optional,
-    Literal
+    Literal,
+    Dict,
+    List,
+    Tuple,
+    Iterable,
 )
 from neo4j import GraphDatabase, Driver
 from langchain.prompts import ChatPromptTemplate
@@ -256,9 +260,8 @@ class MemoryGraph(MemoryPersistence):
 
     async def llm_parser(
         self,
-        prompt_text: str,
-        prompt_user: Optional[str] = None
-    ) -> GraphComponents:
+        prompt_text: str
+    ) -> dict:
         """
         Uses OpenAI's LLM to parse the prompt and extract graph components.
         Args:
@@ -303,12 +306,7 @@ class MemoryGraph(MemoryPersistence):
                 )
                 raise ValueError("OpenAI response content is None")
 
-            raw_content = response.graph   # type: ignore
-            self.logger.debug(
-                f"LLM response messages: {raw_content}",
-                extra=get_metadata(thread_id=str(self.thread_id))
-            )
-            return raw_content
+            return response  # type: ignore
         except Exception as e:
             self.logger.error(
                 f"Error during LLM parsing: {str(e)}",
@@ -318,24 +316,16 @@ class MemoryGraph(MemoryPersistence):
 
     async def extract_graph_components(
         self,
-        raw_data: str,
-        **kwargs
-    ) -> tuple[dict[str, str], list[dict[str, str]]]:
+        raw_data: str
+    ) -> Tuple[Dict[str, str], List[Dict[str, str]]]:
         """
-        Extract nodes and relationships from the provided
-        raw data using LLM.
-        Args:
-            raw_data (str): The input text containing nodes and relationships.
-            prompt_user (str | None): The user prompt to guide the extraction.
-        Returns:
-            tuple: A tuple containing a dictionary of nodes and a
-                list of relationships.
+        Estrae nodi e relazioni dal testo usando l'LLM.
+        Ritorna:
+        - nodes: dict[name -> uuid4]
+        - relationships: list[{"source": uuid, "target": uuid, "type": str}]
         """
-
-        prompt_user: str | None = kwargs.get("prompt_user", None)
-
         prompt: str = (
-            f"Extract nodes and relationships from the following text:\n"
+            "Extract nodes and relationships from the following text:\n"
             f"{raw_data}"
         )
 
@@ -343,13 +333,12 @@ class MemoryGraph(MemoryPersistence):
             f"Extracting graph components from raw data: {prompt}",
             extra=get_metadata(thread_id=str(self.thread_id))
         )
-        # Assuming this returns a list of dictionaries
-        parsed_response = await self.llm_parser(
-            prompt,
-            prompt_user=prompt_user
-        )
-        if not parsed_response:
-            msg: str = (
+
+        # parsed_response dovrebbe essere un oggetto pydantic
+        # o simile con .graph
+        parsed_response = await self.llm_parser(prompt)
+        if not parsed_response or not getattr(parsed_response, "graph", None):
+            msg = (
                 "Parsed response is empty or does not contain "
                 "'graph' attribute"
             )
@@ -359,40 +348,57 @@ class MemoryGraph(MemoryPersistence):
             )
             raise ValueError(msg)
 
-        # Assuming the 'graph' structure is a key in the parsed response
-        parsed_response = parsed_response.graph
-        nodes = {}
-        relationships = []
+        entries: Iterable[Any] = parsed_response.graph  # type: ignore
+        nodes: Dict[str, str] = {}
+        relationships: List[Dict[str, str]] = []
 
-        for entry in parsed_response:
-            target_node = entry.target_node  # Get target_node from the entry
-            node = entry.node
-            relationship = entry.relationship  # Get relationship if available
+        def _get(entry: Any, key: str) -> Any:
+            # supporta sia oggetti (attr) sia dict
+            if isinstance(entry, dict):
+                return entry.get(key)
+            return getattr(entry, key, None)
 
-            # Add nodes to the dictionary with a unique ID
+        for entry in entries:
+            node = _get(entry, "node")
+            rel_type = _get(entry, "relationship")
+            tgt = _get(entry, "target_node")
+
+            if not node or not rel_type or not tgt:
+                # skipa record malformati
+                continue
+
+            # Normalizza target_node a lista di stringhe
+            targets: List[str]
+            if isinstance(tgt, list):
+                # filtra solo stringhe non-vuote
+                targets = [t for t in tgt if isinstance(t, str) and t.strip()]
+            elif isinstance(tgt, str) and tgt.strip():
+                targets = [tgt]
+            else:
+                continue  # nulla di valido
+
+            # Assicura UUID per ogni nodo incontrato
             if node not in nodes:
                 nodes[node] = str(uuid.uuid4())
 
-            if target_node and target_node not in nodes:
-                nodes[target_node] = str(uuid.uuid4())
+            for target in targets:
+                if target not in nodes:
+                    nodes[target] = str(uuid.uuid4())
 
-            # Add relationship to the relationships list with node IDs
-            if target_node and relationship:
+                # Crea edge atomico (solo tipi hashable e serializzabili)
                 relationships.append({
                     "source": nodes[node],
-                    "target": nodes[target_node],
-                    "type": relationship
+                    "target": nodes[target],
+                    "type": rel_type
                 })
 
-        msg: str = (
+        msg = (
             f"Extracted {len(nodes)} nodes and "
             f"{len(relationships)} relationships from the raw data."
         )
         self.logger.debug(
             msg,
-            extra=get_metadata(
-                thread_id=str(self.thread_id)
-            )
+            extra=get_metadata(thread_id=str(self.thread_id))
         )
         return nodes, relationships
 
