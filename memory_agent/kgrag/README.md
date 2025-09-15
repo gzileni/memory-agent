@@ -1,5 +1,7 @@
 # KGrag
 
+![kgrag](./kgrag.jpg)
+
 LLMs show strong reasoning abilities but struggle to connect information in ways that feel intuitive; traditional RAG solutions often fail to synthesize complex information correctly.
 
 `memory-agent` combines symbolic knowledge stored in [Neo4j](https://neo4j.com/) with vector semantic search in [Qdrant](https://qdrant.tech/). Neo4j holds entities, relationships, ontological constraints and enables graph reasoning (paths, neighborhoods, patterns), while Qdrant indexes embeddings of text chunks and node descriptions for high‑similarity semantic retrieval.
