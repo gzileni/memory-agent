@@ -2,17 +2,13 @@ import asyncio
 from demo_kgrag_ollama import kgrag_ollama
 
 
-async def query(prompt: str):
-    response = await kgrag_ollama.query(prompt)
-    return response
-
-
 async def main():
-    result = await query(
-        "Come misurare empiricamente il “consumo effettivo” "
-        "e stimare la CAWF?"
+    prompt = (
+        "How Big Data Dilutes Cognitive Resources, Interferes with Rational "
+        "Decision-making and Affects Wealth Distribution ?"
     )
-    print(result)
+    response = await kgrag_ollama.query(prompt)
+    print(response)
 
 if __name__ == "__main__":
     asyncio.run(main())

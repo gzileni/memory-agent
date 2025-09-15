@@ -5,7 +5,6 @@ from typing import (
     LiteralString,
     AsyncGenerator,
     Any,
-    Optional,
     Literal,
     Dict,
     List,
@@ -29,9 +28,7 @@ from .cache import MemoryRedisCacheRetriever
 from abc import abstractmethod
 from pyaws_s3 import S3Client
 from qdrant_client.models import PointStruct
-from langchain_ollama import OllamaEmbeddings
 from neo4j_graphrag.retrievers import QdrantNeo4jRetriever
-from langchain_openai import OpenAIEmbeddings
 from .memory_persistence import MemoryPersistence
 
 PathType = Literal["fs", "s3"]
@@ -811,50 +808,9 @@ class MemoryGraph(MemoryPersistence):
             )
             raise e
 
-    async def query_stream(
-        self,
-        query: str,
-        entity_ids: Optional[list[Any]] = None
-    ):
-        """
-        Query the memory graph using the provided query.
-        Args:
-            query (str): The query to be executed on the memory graph.
-            collection_name (str, optional): The name of the Qdrant
-                collection to use for the query.
-            entity_ids (Optional[list[Any]]): A list of entity IDs
-                to fetch related nodes and relationships.
-        Returns:
-            list: A list of search results from the memory graph.
-        Raises:
-            ValueError: If the collection name is not provided
-                or if the query is empty.
-        """
-        try:
-            if not query:
-                raise ValueError("Query must not be empty")
-
-            graph_context = self._get_graph_context(
-                query,
-                entity_ids=entity_ids
-            )
-            async for s in self._stream(
-                graph_context=graph_context,
-                user_query=query
-            ):
-                self.logger.debug(f"Generated answer from LLM: {s}")
-                yield s
-        except Exception as e:
-            self.logger.error(
-                f"Error during query process: {str(e)}",
-                extra=get_metadata(thread_id=str(self.thread_id))
-            )
-            raise e
-
     async def query(
         self,
-        query: str,
-        entity_ids: Optional[list[Any]] = None
+        query: str
     ):
         """
         Query the memory graph using the provided query.
@@ -875,8 +831,7 @@ class MemoryGraph(MemoryPersistence):
                 raise ValueError("Query must not be empty")
 
             graph_context = self._get_graph_context(
-                query,
-                entity_ids=entity_ids
+                query
             )
 
             # Run the LLM to get the answer
@@ -933,8 +888,7 @@ class MemoryGraph(MemoryPersistence):
 
     def _get_graph_context(
         self,
-        query,
-        entity_ids: Optional[list[Any]] = None
+        query
     ):
         """
         Get the graph context for the provided query.
@@ -949,8 +903,7 @@ class MemoryGraph(MemoryPersistence):
             ValueError: If the Neo4j driver is not initialized
                 or if the query is empty.
         """
-        if entity_ids is None:
-            entity_ids = self.retrieve_ids(query=query)
+        entity_ids = self.retrieve_ids(query=query)
 
         self.logger.debug(
                 f"Extracted {len(entity_ids)} entity IDs from the "
@@ -1752,6 +1705,15 @@ class MemoryGraph(MemoryPersistence):
         )
 
     @abstractmethod
+    def embed_query(self, query: str) -> list[float]:
+        """
+        Get the embedding for a given query.
+        Args:
+            query (str): The query to be embedded.
+        """
+        pass
+
+    @abstractmethod
     def embeddings(
         self,
         raw_data
@@ -1856,26 +1818,7 @@ class MemoryGraph(MemoryPersistence):
                 id_property_neo4j="id",
             )
 
-            openai_embeddings = self.get_embedding_model()
-
-            if not (
-                isinstance(openai_embeddings, OpenAIEmbeddings) or
-                (
-                    OllamaEmbeddings and
-                    isinstance(openai_embeddings, OllamaEmbeddings)
-                )
-            ):
-                msg: str = (
-                    "Embedding model must be an instance of "
-                    "OpenAIEmbeddings or OllamaEmbeddings"
-                )
-                self.logger.error(
-                    msg,
-                    extra=get_metadata(thread_id=str(self.thread_id))
-                )
-                raise ValueError(msg)
-
-            query_vector = openai_embeddings.embed_query(query)
+            query_vector = self.embed_query(query)
             results = retriever.search(
                 query_vector=query_vector,
                 top_k=5

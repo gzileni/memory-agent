@@ -22,6 +22,14 @@ class KGragOpenAI(MemoryOpenAI):
         }
         self.llm_config = kwargs.get("llm_config", openai_config_default)
 
+    def embed_query(self, query: str) -> list[float]:
+        """
+        Get the embedding for a given query.
+        Args:
+            query (str): The query to be embedded.
+        """
+        return self.model_embedding.embed_query(query)
+
     def embeddings(
         self,
         raw_data
@@ -30,7 +38,7 @@ class KGragOpenAI(MemoryOpenAI):
         Get embeddings for the provided raw data using the OpenAI model.
         """
         embeddings = [
-                self.model_embedding.embed_query(paragraph)
+                self.embed_query(paragraph)
                 for paragraph in raw_data.split("\n")
             ]
         return embeddings
