@@ -32,6 +32,9 @@ The library allows managing both [**persistence**](https://langchain-ai.github.i
   - `pip install`
   - [Docker‑ready](./docker/README.md)
 
+### [**GraphRag Agent**](./memory_agent/kgrag/README.md)
+`memory-agent` combines symbolic knowledge stored in [Neo4j](https://neo4j.com/) with vector semantic search in [Qdrant](https://qdrant.tech/)
+
 ---
 
 ## 🧠 Memory vs 🗃️ Persistence
@@ -50,11 +53,11 @@ pip install memory-agent
 ```
 
 For local use with **Ollama** or local embeddings:
-- Install Ollama: https://ollama.ai
+- Install Ollama: [https://ollama.ai](https://ollama.ai)
 
 ---
 
-## ▶️ Usage examples (repository root)
+## ▶️ Usage examples
 
 The examples show how to configure the agent, send messages (including **streaming**) and share memory between different agents.
 
@@ -177,10 +180,10 @@ python demo_mem_shared.py
 
 ## ⚙️ Prerequisites
 
-- **Redis** running (used for short‑term memory)
+- **Redis** running (used for short‑term and long-term memory)
 - **Ollama** running (LLM and optionally embeddings)
 - **OpenAI** API KEY to make request to OpenAI API
-- Correct variables/URLs in `demo_config.py`
+- Correct variables/URLs in [`demo_config.py`](./demo_config.py)
 
 ---
 
