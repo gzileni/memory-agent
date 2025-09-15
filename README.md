@@ -207,4 +207,13 @@ python demo_mem_shared.py
 
 ---
 
+## Application
+
+- [`kgrag-mcp-server`](https://gzileni.github.io/kgrag_mcp_server/)
+KGrag MCP Server is a server that implements the Model Context Protocol (MCP) for managing, ingesting, and querying structured and unstructured data. It is designed for easy integration with graph databases (Neo4j), AWS S3 storage, Redis cache, vector search engines (Qdrant), and advanced language models (LLM).
+The project provides a scalable, containerized infrastructure via Docker Compose to orchestrate data pipelines, semantic enrichment, and analysis through advanced queries.
+Ideal for knowledge graph, AI, and information flow automation applications.
+
+---
+
 ## [📄 License MIT](./LICENSE.md)
