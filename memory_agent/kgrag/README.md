@@ -1,6 +1,6 @@
 # KGrag
 
-![kgrag](./kgrag.jpg)
+![kgrag](./kgrag.jpeg)
 
 LLMs show strong reasoning abilities but struggle to connect information in ways that feel intuitive; traditional RAG solutions often fail to synthesize complex information correctly.
 
