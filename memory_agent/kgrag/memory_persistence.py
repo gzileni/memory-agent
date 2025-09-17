@@ -267,8 +267,7 @@ class MemoryPersistence(MemoryStore):
     async def search_filter_async(
         self,
         query: str,
-        metadata_value: str,
-        collection: str | None = None
+        metadata_value: str
     ) -> list[Document]:
         """
         Get the filter conditions for the Qdrant search.

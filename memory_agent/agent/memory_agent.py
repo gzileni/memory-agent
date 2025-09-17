@@ -66,8 +66,7 @@ class MemoryAgent(MemoryManager):
 
         self.agent = kwargs.get("agent", self.agent)
         self.refresh_checkpointer = kwargs.get(
-            "refresh_checkpointer",
-            self.refresh_checkpointer
+            "refresh_checkpointer"
         )
 
     def create_agent(

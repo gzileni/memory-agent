@@ -467,7 +467,6 @@ class MemoryGraph(MemoryPersistence):
                         type=relationship["type"]
                     )
 
-            return nodes
         except Exception as e:
             self.logger.error(
                 f"Error during Neo4j ingestion: {str(e)}",
@@ -761,7 +760,10 @@ class MemoryGraph(MemoryPersistence):
 
             index += 1
 
-    async def _ingestion(self, raw_data, metadata: dict | None = None):
+    async def _ingestion(
+        self,
+        raw_data, metadata: dict | None = None
+    ) -> AsyncGenerator[Any, Any]:
         """
         Ingest data into the memory graph.
         This method should be implemented to handle the ingestion process.
@@ -786,15 +788,15 @@ class MemoryGraph(MemoryPersistence):
                 f"{len(relationships)} relationships from the raw data."
             )
             yield "Saving nodes and relationships"
-            node_id_mapping = self.ingest_to_neo4j(nodes, relationships)
+            self.ingest_to_neo4j(nodes, relationships)
             self.logger.debug(
-                f"Ingested {len(node_id_mapping)} nodes into Neo4j."
+                f"Ingested {len(nodes)} nodes into Neo4j."
             )
             yield "Vectorizing raw data and ingesting data"
 
             await self.ingest_to_qdrant(
                 raw_data=raw_data,
-                node_id_mapping=node_id_mapping,
+                node_id_mapping=nodes,
                 metadata=metadata
             )
             yield "Vectorized raw data and ingested data"
