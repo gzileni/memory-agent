@@ -687,7 +687,7 @@ class MemoryGraph(MemoryPersistence):
                 if the user query is empty.
         """
 
-        prompt = ChatPromptTemplate.from_messages([
+        prompt = ChatPromptTemplate([
             (
                 "system",
                 "Provide the answer for the following question:"
@@ -762,7 +762,8 @@ class MemoryGraph(MemoryPersistence):
 
     async def _ingestion(
         self,
-        raw_data, metadata: dict | None = None
+        raw_data,
+        metadata: dict | None = None
     ) -> AsyncGenerator[Any, Any]:
         """
         Ingest data into the memory graph.
