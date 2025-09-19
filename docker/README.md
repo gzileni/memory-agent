@@ -1,4 +1,4 @@
-# memory-agent — [Docker Compose](./docker-compose.yml)
+# Docker — [Docker Compose](./docker-compose.yml)
 
 This repository folder contains the Docker Compose configuration for the memory-agent service stack (Redis, Qdrant, Loki, Promtail and Grafana).
 
